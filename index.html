@@ -20,6 +20,7 @@
 </head>
 <body>
 
+  <!-- CONTAINER PRINCIPAL DE LOGIN -->
   <div id="login-container" class="login-overlay">
     <div class="login-card">
       <div class="login-header">
@@ -35,6 +36,7 @@
     </div>
   </div>
 
+  <!-- CONTAINER DO APP PRINCIPAL -->
   <div id="app-container" class="app-layout hidden">
     
     <header class="app-header">
@@ -131,7 +133,7 @@
               <h4 data-i18n="results_title">Clientes Encontrados</h4>
               <span id="results-count" class="badge">0</span>
             </div>
-            <div id="prospects-list" class="list-container" style="padding-bottom: 90px;">
+            <div id="prospects-list" class="list-container" style="padding-bottom: 120px;">
               <div class="empty-state">
                 <i data-lucide="map"></i>
                 <p data-i18n="empty_prospects">Digite um termo e busque para carregar os prospects.</p>
@@ -159,7 +161,7 @@
               </select>
             </div>
 
-            <div id="visitas-list" class="list-container" style="padding-bottom: 90px;">
+            <div id="visitas-list" class="list-container" style="padding-bottom: 120px;">
               <div class="empty-state">
                 <i data-lucide="check-square"></i>
                 <p data-i18n="empty_visitas">Nenhuma visita registrada no CRM ainda.</p>
@@ -189,17 +191,21 @@
 
         </div>
 
-        <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
+        <!-- BARRA FLUTUANTE DE ROTA (Otimizada) -->
+        <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
-            <span style="font-size: 0.9rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
+            <span style="font-size: 0.95rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
             <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
           </div>
+          <!-- Visor de Distância e Tempo (Inicia vazio) -->
+          <div id="route-metrics" style="font-size: 0.8rem; color: #38bdf8; font-weight: 500; display: none;"></div>
+          
           <div style="display: flex; gap: 10px;">
             <button id="btn-draw-route" class="btn btn-outline" style="flex: 1; border-color: #475569; color: white; padding: 8px;">
-              🗺️ Ver no Mapa
+              🗺️ Rota no Mapa
             </button>
-            <button id="btn-gps-route" class="btn btn-primary" style="flex: 1; padding: 8px;">
-              📱 Abrir GPS
+            <button id="btn-gps-route" class="btn btn-primary" style="flex: 1; padding: 8px; background-color: #2563eb;">
+              📱 Iniciar GPS
             </button>
           </div>
         </div>
@@ -219,7 +225,7 @@
 
     </main>
 
-    <!-- MODAL DE CRM FLUTUANTE (ATUALIZADO E ENRIQUECIDO) -->
+    <!-- MODAL DE CRM FLUTUANTE (DADOS PROFUNDOS) -->
     <div id="crm-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -238,9 +244,8 @@
               <i data-lucide="map-pin"></i>
               <span id="crm-place-address">Endereço do Local</span>
             </p>
-            <div id="crm-action-links" style="display: flex; gap: 8px; margin-top: 12px; margin-bottom: 4px;">
-              <!-- Botões do site e google injetados via JS -->
-            </div>
+            <!-- Container Dinâmico de Links (Site, Reviews, Loader) -->
+            <div id="crm-action-links" style="display: flex; gap: 8px; margin-top: 12px; margin-bottom: 4px;"></div>
           </div>
           <form id="crm-form" class="crm-form">
             <div class="form-group">

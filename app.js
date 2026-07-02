@@ -363,7 +363,7 @@ document.getElementById("btn-logout").addEventListener("click", () => {
 });
 
 // ==========================================================================
-// 6. BUSCA E RENDERIZAÇÃO DE PROSPECTS (COM CHECKBOX)
+// 6. BUSCA E RENDERIZAÇÃO DE PROSPECTS
 // ==========================================================================
 
 document.getElementById("btn-search").addEventListener("click", performPlacesSearch);
@@ -547,10 +547,16 @@ function renderVisitasList() {
     card.style.gap = "12px";
     
     const isChecked = selectedRoutePlaces.some(p => p.id === visit.placeId) ? "checked" : "";
+    
+    // UI: Botão de Check-in rápido se não estiver visitado
+    const quickActionHtml = visit.status !== 'Visitado' 
+      ? `<button class="btn-quick-visit" data-id="${visit.placeId}" title="Marcar como Visitado" style="background:none; border:none; color:#10b981; cursor:pointer; padding:4px; margin-top:2px; display:flex;"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></button>` 
+      : `<span style="color:#10b981; padding:4px; margin-top:2px; display:flex;" title="Visita Concluída"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></span>`;
 
     card.innerHTML = `
-      <div style="padding-top: 4px;">
+      <div style="padding-top: 4px; display:flex; flex-direction:column; align-items:center; gap:8px;">
         <input type="checkbox" class="route-checkbox" data-id="${visit.placeId}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked}>
+        ${quickActionHtml}
       </div>
       <div style="flex: 1; cursor: pointer; position: relative;" class="visit-card-content">
         <span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>
@@ -560,6 +566,22 @@ function renderVisitasList() {
         <p class="item-detail" style="margin:4px 0 0 0; font-size: 0.75rem;">Status: <b>${visit.status}</b></p>
       </div>
     `;
+
+    // Evento de Check-in Rápido ("Visita Concluída")
+    const quickVisitBtn = card.querySelector('.btn-quick-visit');
+    if (quickVisitBtn) {
+      quickVisitBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Impede a abertura do modal
+        try {
+          await db.collection("visitas").doc(visit.placeId).update({
+            status: "Visitado",
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch (error) {
+          console.error("Erro ao atualizar status:", error);
+        }
+      });
+    }
 
     const checkbox = card.querySelector(".route-checkbox");
     checkbox.addEventListener("change", (e) => {
@@ -608,7 +630,7 @@ function renderVisitasList() {
 document.getElementById("filter-visit-status").addEventListener("change", renderVisitasList);
 
 // ==========================================================================
-// 8. CONTROLE DE PINOS DE ALTA VISIBILIDADE & BALÕES (INFO WINDOW)
+// 8. CONTROLE DE PINOS DE ALTA VISIBILIDADE & BALÕES
 // ==========================================================================
 
 function triggerInfoWindow(marker, name, address, status, phone) {
@@ -628,7 +650,6 @@ function triggerInfoWindow(marker, name, address, status, phone) {
       <div style="font-size: 11px; font-weight: 600; display:flex; align-items:center; gap:4px; margin-bottom: 4px;">
         <span>Status:</span> <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${emoji} ${cleanStatus}</span>
       </div>
-      ${phone && phone !== '---' ? `<p style="margin: 4px 0 0 0; font-size: 11px; color: #475569;"><b>Tel:</b> ${phone}</p>` : ''}
     </div>
   `;
   infoWindow.setContent(boxContent);
@@ -721,7 +742,7 @@ function getStatusHexColor(status) {
 }
 
 // ==========================================================================
-// 9. MODAL CRM (AGORA COM ENRIQUECIMENTO DE DADOS DO GOOGLE PLACES)
+// 9. MODAL CRM (DADOS PROFUNDOS GOOGLE + LOADING)
 // ==========================================================================
 
 const modal = document.getElementById("crm-modal");
@@ -730,23 +751,25 @@ const crmForm = document.getElementById("crm-form");
 function openCrmModal(prospect) {
   currentSelectedProspect = prospect;
   
-  // Elementos do DOM
+  // DOM Elements
   document.getElementById("crm-place-name").textContent = prospect.name;
   document.getElementById("crm-place-address").textContent = prospect.address;
   const phoneInput = document.getElementById("crm-place-phone");
   const ratingContainer = document.getElementById("crm-place-rating");
   const actionLinks = document.getElementById("crm-action-links");
   
-  // Reset Limpo da UI
+  // Limpeza de UI e Setup de Loading
   phoneInput.value = prospect.phone || "";
   ratingContainer.innerHTML = "";
-  actionLinks.innerHTML = "";
+  actionLinks.innerHTML = `<span style="font-size:0.8rem; color:#64748b; display:flex; align-items:center; gap:4px;"><i data-lucide="loader-2" class="lucide-spin" style="width:14px; height:14px;"></i> Buscando dados do Google...</span>`;
+  lucide.createIcons();
+  
   document.getElementById("crm-contact-name").value = "";
   document.getElementById("crm-contact-email").value = "";
   document.getElementById("crm-visit-status").value = "A Visitar";
   document.getElementById("crm-visit-notes").value = "";
 
-  // Se já houver dados no Firestore (CRM), aplica por cima primeiro
+  // Sobrescreve com dados do Firestore (se já for cliente salvo)
   if (savedVisits[prospect.id]) {
     const historicalData = savedVisits[prospect.id];
     phoneInput.value = historicalData.placePhone || phoneInput.value;
@@ -756,26 +779,27 @@ function openCrmModal(prospect) {
     document.getElementById("crm-visit-notes").value = historicalData.visitNotes || "";
   }
 
-  // Requisição Profunda ao Google: Puxa Avaliação, Telefone Exato e Websites
+  // Chamada Profunda Google Places API
   const request = {
     placeId: prospect.id,
     fields: ['formatted_phone_number', 'website', 'rating', 'url']
   };
 
   placesService.getDetails(request, (place, status) => {
+    actionLinks.innerHTML = ""; // Limpa o "Buscando..."
+    
     if (status === google.maps.places.PlacesServiceStatus.OK) {
-      
-      // Sobrescreve o telefone caso esteja vazio, ou se ainda for o provisório do prospect
+      // Telefone
       if (place.formatted_phone_number && (!phoneInput.value || phoneInput.value === prospect.phone)) {
         phoneInput.value = place.formatted_phone_number;
       }
       
-      // Injeta estrelas e nota
+      // Avaliações
       if (place.rating) {
         ratingContainer.innerHTML = `⭐ ${place.rating}`;
       }
       
-      // Gera os botões de atalho
+      // Botões de Inteligência
       if (place.website || place.url) {
         let linksHtml = '';
         if (place.website) {
@@ -785,8 +809,10 @@ function openCrmModal(prospect) {
           linksHtml += `<a href="${place.url}" target="_blank" class="btn btn-outline btn-sm" style="flex:1; padding:6px; font-size:0.8rem; text-decoration:none; display:flex; justify-content:center; align-items:center; gap:4px;"><i data-lucide="star" style="width:16px;"></i> Ver Reviews</a>`;
         }
         actionLinks.innerHTML = linksHtml;
-        lucide.createIcons(); // renderiza os novos ícones
+        lucide.createIcons();
       }
+    } else {
+      actionLinks.innerHTML = `<span style="font-size:0.75rem; color:#94a3b8;">*Nenhum dado digital extra encontrado no Google.</span>`;
     }
   });
 
@@ -837,7 +863,7 @@ crmForm.addEventListener("submit", async (e) => {
 });
 
 // ==========================================================================
-// 10. PAINEL ADMINISTRATIVO (CONTROLE DE ACESSOS)
+// 10. PAINEL ADMINISTRATIVO
 // ==========================================================================
 
 let usersListenerUnsubscribe = null;
@@ -1000,7 +1026,7 @@ function generatePDFReport() {
 }
 
 // ==========================================================================
-// 12. LOGICA DE INTERFACE: TABS & EVENTOS INICIAIS
+// 12. LOGICA DE INTERFACE
 // ==========================================================================
 
 document.querySelectorAll(".tab-link").forEach(tabLink => {
@@ -1026,7 +1052,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ==========================================================================
-// 13. SISTEMA DE ROTEAMENTO (MAPA & GPS)
+// 13. SISTEMA DE ROTEAMENTO COM MÉTRICAS
 // ==========================================================================
 
 let directionsService;
@@ -1051,12 +1077,17 @@ function handleRouteSelection(isChecked, placeData) {
 
   const actionBar = document.getElementById("route-action-bar");
   const countSpan = document.getElementById("route-count");
+  const metricsDisplay = document.getElementById("route-metrics");
 
   if (selectedRoutePlaces.length > 0) {
     actionBar.style.display = "flex";
     if(countSpan) countSpan.textContent = selectedRoutePlaces.length;
+    // Reseta métricas ao alterar os pontos
+    metricsDisplay.style.display = "none";
+    metricsDisplay.innerHTML = "";
   } else {
     actionBar.style.display = "none";
+    metricsDisplay.style.display = "none";
     if (directionsRenderer) directionsRenderer.setDirections({routes: []});
   }
 }
@@ -1068,6 +1099,7 @@ document.getElementById("btn-clear-route")?.addEventListener("click", () => {
   renderProspectsList();
   
   document.getElementById("route-action-bar").style.display = "none";
+  document.getElementById("route-metrics").style.display = "none";
   if (directionsRenderer) directionsRenderer.setDirections({routes: []});
 });
 
@@ -1096,6 +1128,28 @@ document.getElementById("btn-draw-route")?.addEventListener("click", () => {
   }, (response, status) => {
     if (status === "OK") {
       directionsRenderer.setDirections(response);
+      
+      // Lógica de Extração de Tempo e Distância
+      let totalDistance = 0; // Metros
+      let totalDuration = 0; // Segundos
+      const legs = response.routes[0].legs;
+      
+      for (let i = 0; i < legs.length; ++i) {
+        totalDistance += legs[i].distance.value;
+        totalDuration += legs[i].duration.value;
+      }
+      
+      const distKm = (totalDistance / 1000).toFixed(1);
+      const mins = Math.round(totalDuration / 60);
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      const timeStr = hours > 0 ? `${hours}h ${remMins}min` : `${mins} min`;
+      
+      const metricsDisplay = document.getElementById("route-metrics");
+      metricsDisplay.innerHTML = `<i data-lucide="info" style="width:14px; display:inline; vertical-align:middle;"></i> <b>Estimativa:</b> ${distKm} km • ${timeStr} de viagem`;
+      metricsDisplay.style.display = "block";
+      lucide.createIcons();
+      
     } else {
       alert("Não foi possível calcular a rota: " + status);
     }
