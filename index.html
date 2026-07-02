@@ -5,28 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>D2 Group CRM - Prospecção em Campo</title>
   
-  <!-- Fontes do Google -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <!-- Ícones Lucide -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Firebase SDK (v10 Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  
-  <!-- Biblioteca PDF (jsPDF) via CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
-  <!-- Estilos Customizados -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- CONTAINER PRINCIPAL DE LOGIN -->
   <div id="login-container" class="login-overlay">
     <div class="login-card">
       <div class="login-header">
@@ -42,10 +35,8 @@
     </div>
   </div>
 
-  <!-- CONTAINER DO APP PRINCIPAL -->
   <div id="app-container" class="app-layout hidden">
     
-    <!-- BARRA SUPERIOR (HEADER) -->
     <header class="app-header">
       <div class="header-brand" style="display: flex; align-items: center; gap: 15px;">
         <img src="logo.png" alt="D2 Group" style="max-height: 45px; width: auto; object-fit: contain;">
@@ -56,7 +47,6 @@
       </div>
       
       <div class="header-actions">
-        <!-- Seletor de Idiomas -->
         <div class="language-selector" style="display: flex; gap: 8px; align-items: center;">
           <button class="lang-btn" data-lang="pt" title="Português" style="background:none; border:none; cursor:pointer;">
             <img src="https://flagcdn.com/w20/br.png" width="24" alt="Brasil" style="border-radius: 2px;">
@@ -69,7 +59,6 @@
           </button>
         </div>
 
-        <!-- Perfil do Usuário -->
         <div class="user-profile">
           <img id="user-avatar" src="" alt="Avatar" class="avatar">
           <div class="user-info">
@@ -83,13 +72,10 @@
       </div>
     </header>
 
-    <!-- ÁREA DE CONTEÚDO PRINCIPAL (SPLIT SCREEN) -->
     <main class="main-content">
       
-      <!-- PAINEL LATERAL ESQUERDO (Aviso: Adicionado position: relative aqui) -->
       <aside class="sidebar" style="position: relative;">
         
-        <!-- BARRA DE BUSCA E FILTROS -->
         <section class="search-section card">
           <div class="card-header">
             <h3 data-i18n="search_title">Encontrar Clientes em Potencial</h3>
@@ -123,7 +109,6 @@
           </div>
         </section>
 
-        <!-- NAVEGAÇÃO ENTRE ABAS DA SIDEBAR -->
         <nav class="sidebar-tabs">
           <button class="tab-link active" data-tab="tab-prospects">
             <i data-lucide="compass"></i>
@@ -139,16 +124,13 @@
           </button>
         </nav>
 
-        <!-- CONTEÚDO DAS ABAS -->
         <div class="tab-content-container">
           
-          <!-- ABA 1: PROSPECTS DA BUSCA ATUAL -->
           <div id="tab-prospects" class="tab-panel active">
             <div class="panel-header">
               <h4 data-i18n="results_title">Clientes Encontrados</h4>
               <span id="results-count" class="badge">0</span>
             </div>
-            <!-- Lista com padding para não esconder atrás da barra de rota -->
             <div id="prospects-list" class="list-container" style="padding-bottom: 90px;">
               <div class="empty-state">
                 <i data-lucide="map"></i>
@@ -157,7 +139,6 @@
             </div>
           </div>
 
-          <!-- ABA 2: VISITAS CADASTRADAS NO FIRESTORE -->
           <div id="tab-visitas" class="tab-panel">
             <div class="panel-header">
               <h4 data-i18n="saved_title">Visitas Registradas</h4>
@@ -178,7 +159,6 @@
               </select>
             </div>
 
-            <!-- Lista com padding para não esconder atrás da barra de rota -->
             <div id="visitas-list" class="list-container" style="padding-bottom: 90px;">
               <div class="empty-state">
                 <i data-lucide="check-square"></i>
@@ -187,7 +167,6 @@
             </div>
           </div>
 
-          <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
           <div id="tab-admin" class="tab-panel">
             <div class="panel-header">
               <h4 data-i18n="admin_panel_title">Controle de Acessos</h4>
@@ -203,7 +182,6 @@
                   </tr>
                 </thead>
                 <tbody id="admin-users-list">
-                  <!-- Carregado via JS -->
                 </tbody>
               </table>
             </div>
@@ -211,7 +189,6 @@
 
         </div>
 
-        <!-- BARRA FLUTUANTE DE ROTA MOVIDA PARA COBRIR TODAS AS ABAS -->
         <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
             <span style="font-size: 0.9rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
@@ -229,7 +206,6 @@
 
       </aside>
 
-      <!-- ÁREA DO MAPA (GOOGLE MAPS) -->
       <section class="map-wrapper">
         <div id="map"></div>
         <div class="map-legend">
@@ -243,7 +219,7 @@
 
     </main>
 
-    <!-- MODAL DE CRM FLUTUANTE -->
+    <!-- MODAL DE CRM FLUTUANTE (ATUALIZADO E ENRIQUECIDO) -->
     <div id="crm-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -254,17 +230,23 @@
         </div>
         <div class="modal-body">
           <div class="place-info-box">
-            <h4 id="crm-place-name">Nome do Estabelecimento</h4>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <h4 id="crm-place-name">Nome do Estabelecimento</h4>
+              <div id="crm-place-rating" style="font-size: 0.85rem; font-weight: 700; color: #eab308; display: flex; align-items: center; gap: 4px;"></div>
+            </div>
             <p class="info-line">
               <i data-lucide="map-pin"></i>
               <span id="crm-place-address">Endereço do Local</span>
             </p>
-            <p class="info-line">
-              <i data-lucide="phone"></i>
-              <span id="crm-place-phone">Telefone</span>
-            </p>
+            <div id="crm-action-links" style="display: flex; gap: 8px; margin-top: 12px; margin-bottom: 4px;">
+              <!-- Botões do site e google injetados via JS -->
+            </div>
           </div>
           <form id="crm-form" class="crm-form">
+            <div class="form-group">
+              <label for="crm-place-phone">Telefone do Local</label>
+              <input type="text" id="crm-place-phone" placeholder="Ex: (00) 0000-0000" class="form-input">
+            </div>
             <div class="form-group">
               <label for="crm-contact-name" data-i18n="crm_contact_name">Nome do Contato / Decisor</label>
               <input type="text" id="crm-contact-name" placeholder="Ex: Diretor, Gerente de Vendas" class="form-input">
@@ -285,7 +267,7 @@
             </div>
             <div class="form-group">
               <label for="crm-visit-notes" data-i18n="crm_visit_notes">Notas da Visita</label>
-              <textarea id="crm-visit-notes" rows="3" placeholder="Insira detalhes sobre a conversa..." class="form-textarea"></textarea>
+              <textarea id="crm-visit-notes" rows="3" placeholder="Insira detalhes sobre a conversa, objeções ou propostas feitas..." class="form-textarea"></textarea>
             </div>
             <div class="form-actions">
               <button type="button" id="btn-cancel-crm" class="btn btn-outline" data-i18n="btn_cancel">Cancelar</button>

@@ -443,7 +443,6 @@ function renderProspectsList() {
       statusDotHtml = `<span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>`;
     }
 
-    // Mantém a caixa checada se o local já foi selecionado para rota
     const isChecked = selectedRoutePlaces.some(p => p.id === prospect.id) ? "checked" : "";
 
     card.innerHTML = `
@@ -457,7 +456,6 @@ function renderProspectsList() {
       </div>
     `;
 
-    // Ação do Checkbox para a Rota
     const checkbox = card.querySelector(".route-checkbox");
     checkbox.addEventListener("change", (e) => {
       handleRouteSelection(e.target.checked, { 
@@ -468,7 +466,6 @@ function renderProspectsList() {
       });
     });
 
-    // Ações de clique e Hover no Cartão (Abre CRM)
     const contentArea = card.querySelector(".visit-card-content");
     contentArea.addEventListener("click", () => openCrmModal(prospect));
     
@@ -724,7 +721,7 @@ function getStatusHexColor(status) {
 }
 
 // ==========================================================================
-// 9. MODAL CRM & GRAVAÇÃO NO FIRESTORE
+// 9. MODAL CRM (AGORA COM ENRIQUECIMENTO DE DADOS DO GOOGLE PLACES)
 // ==========================================================================
 
 const modal = document.getElementById("crm-modal");
@@ -733,27 +730,65 @@ const crmForm = document.getElementById("crm-form");
 function openCrmModal(prospect) {
   currentSelectedProspect = prospect;
   
+  // Elementos do DOM
   document.getElementById("crm-place-name").textContent = prospect.name;
   document.getElementById("crm-place-address").textContent = prospect.address;
+  const phoneInput = document.getElementById("crm-place-phone");
+  const ratingContainer = document.getElementById("crm-place-rating");
+  const actionLinks = document.getElementById("crm-action-links");
   
-  let phone = prospect.phone || "---";
-  if (savedVisits[prospect.id] && savedVisits[prospect.id].placePhone) {
-    phone = savedVisits[prospect.id].placePhone;
-  }
-  document.getElementById("crm-place-phone").textContent = phone;
-
+  // Reset Limpo da UI
+  phoneInput.value = prospect.phone || "";
+  ratingContainer.innerHTML = "";
+  actionLinks.innerHTML = "";
   document.getElementById("crm-contact-name").value = "";
   document.getElementById("crm-contact-email").value = "";
   document.getElementById("crm-visit-status").value = "A Visitar";
   document.getElementById("crm-visit-notes").value = "";
 
+  // Se já houver dados no Firestore (CRM), aplica por cima primeiro
   if (savedVisits[prospect.id]) {
     const historicalData = savedVisits[prospect.id];
+    phoneInput.value = historicalData.placePhone || phoneInput.value;
     document.getElementById("crm-contact-name").value = historicalData.contactName || "";
     document.getElementById("crm-contact-email").value = historicalData.contactEmail || "";
     document.getElementById("crm-visit-status").value = historicalData.status || "A Visitar";
     document.getElementById("crm-visit-notes").value = historicalData.visitNotes || "";
   }
+
+  // Requisição Profunda ao Google: Puxa Avaliação, Telefone Exato e Websites
+  const request = {
+    placeId: prospect.id,
+    fields: ['formatted_phone_number', 'website', 'rating', 'url']
+  };
+
+  placesService.getDetails(request, (place, status) => {
+    if (status === google.maps.places.PlacesServiceStatus.OK) {
+      
+      // Sobrescreve o telefone caso esteja vazio, ou se ainda for o provisório do prospect
+      if (place.formatted_phone_number && (!phoneInput.value || phoneInput.value === prospect.phone)) {
+        phoneInput.value = place.formatted_phone_number;
+      }
+      
+      // Injeta estrelas e nota
+      if (place.rating) {
+        ratingContainer.innerHTML = `⭐ ${place.rating}`;
+      }
+      
+      // Gera os botões de atalho
+      if (place.website || place.url) {
+        let linksHtml = '';
+        if (place.website) {
+          linksHtml += `<a href="${place.website}" target="_blank" class="btn btn-outline btn-sm" style="flex:1; padding:6px; font-size:0.8rem; text-decoration:none; display:flex; justify-content:center; align-items:center; gap:4px;"><i data-lucide="globe" style="width:16px;"></i> Site Oficial</a>`;
+        }
+        if (place.url) {
+          linksHtml += `<a href="${place.url}" target="_blank" class="btn btn-outline btn-sm" style="flex:1; padding:6px; font-size:0.8rem; text-decoration:none; display:flex; justify-content:center; align-items:center; gap:4px;"><i data-lucide="star" style="width:16px;"></i> Ver Reviews</a>`;
+        }
+        actionLinks.innerHTML = linksHtml;
+        lucide.createIcons(); // renderiza os novos ícones
+      }
+    }
+  });
 
   modal.classList.remove("hidden");
 }
@@ -774,12 +809,13 @@ crmForm.addEventListener("submit", async (e) => {
   const contactEmail = document.getElementById("crm-contact-email").value.trim();
   const status = document.getElementById("crm-visit-status").value;
   const visitNotes = document.getElementById("crm-visit-notes").value.trim();
+  const placePhone = document.getElementById("crm-place-phone").value.trim();
 
   const visitPayload = {
     placeId: currentSelectedProspect.id,
     placeName: currentSelectedProspect.name,
     placeAddress: currentSelectedProspect.address,
-    placePhone: currentSelectedProspect.phone || document.getElementById("crm-place-phone").textContent || "",
+    placePhone: placePhone,
     lat: currentSelectedProspect.lat,
     lng: currentSelectedProspect.lng,
     contactName: contactName,
@@ -1006,7 +1042,6 @@ function initRoutingServices() {
   });
 }
 
-// Lida com a seleção de caixas tanto na aba "Resultados" quanto em "Visitas"
 function handleRouteSelection(isChecked, placeData) {
   if (isChecked) {
     selectedRoutePlaces.push(placeData);
@@ -1029,7 +1064,6 @@ function handleRouteSelection(isChecked, placeData) {
 document.getElementById("btn-clear-route")?.addEventListener("click", () => {
   selectedRoutePlaces = [];
   
-  // Re-renderiza ambas as listas para desmarcar visualmente todas as caixas
   renderVisitasList(); 
   renderProspectsList();
   
