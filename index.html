@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D2 Group CRM - Prospecção em Campo</title>
+  
+  <!-- Fontes do Google -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Ícones Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase SDK (v10 Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  
+  <!-- Biblioteca PDF (jsPDF) via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <!-- Estilos Customizados -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- CONTAINER PRINCIPAL DE LOGIN (Apenas exibido se não autenticado) -->
+  <div id="login-container" class="login-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <img src="logo.png" alt="D2 Group" style="width: 100%; max-width: 220px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto 15px auto;">
+        <h2>D2 Group CRM</h2>
+        <p data-i18n="login_subtitle">Plataforma Avançada de Prospecção em Campo</p>
+      </div>
+      <button id="btn-login-google" class="btn btn-primary btn-block">
+        <i data-lucide="log-in"></i>
+        <span data-i18n="btn_login_google">Entrar com Google</span>
+      </button>
+      <div id="login-error" class="error-message hidden"></div>
+    </div>
+  </div>
+
+  <!-- CONTAINER DO APP PRINCIPAL (Ocultado até login) -->
+  <div id="app-container" class="app-layout hidden">
+    
+    <!-- BARRA SUPERIOR (HEADER) -->
+    <header class="app-header">
+      <div class="header-brand" style="display: flex; align-items: center; gap: 15px;">
+        <img src="logo.png" alt="D2 Group" style="max-height: 45px; width: auto; object-fit: contain;">
+        <div style="display: flex; flex-direction: column; justify-content: center;">
+            <h2 style="margin: 0; font-size: 1.2rem; line-height: 1; color: #ffffff;">CRM</h2>
+            <span style="font-size: 0.8rem; color: #a0aec0; margin-top: 4px;">Plataforma de Prospecção</span>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <!-- Seletor de Idiomas (Agora usando SVGs para garantir funcionamento no Windows) -->
+        <div class="language-selector" style="display: flex; gap: 8px; align-items: center;">
+          <button class="lang-btn" data-lang="pt" title="Português" style="background:none; border:none; cursor:pointer;">
+            <img src="https://flagcdn.com/w20/br.png" width="24" alt="Brasil" style="border-radius: 2px;">
+          </button>
+          <button class="lang-btn" data-lang="en" title="English" style="background:none; border:none; cursor:pointer;">
+            <img src="https://flagcdn.com/w20/us.png" width="24" alt="EUA" style="border-radius: 2px;">
+          </button>
+          <button class="lang-btn" data-lang="es" title="Español" style="background:none; border:none; cursor:pointer;">
+            <img src="https://flagcdn.com/w20/es.png" width="24" alt="Espanha" style="border-radius: 2px;">
+          </button>
+        </div>
+
+        <!-- Perfil do Usuário -->
+        <div class="user-profile">
+          <img id="user-avatar" src="" alt="Avatar" class="avatar">
+          <div class="user-info">
+            <span id="user-name" class="user-display-name">Nome</span>
+            <span id="user-role" class="user-role-tag">Carregando...</span>
+          </div>
+          <button id="btn-logout" class="btn btn-icon-only" title="Sair">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ÁREA DE CONTEÚDO PRINCIPAL (SPLIT SCREEN) -->
+    <main class="main-content">
+      
+      <!-- PAINEL LATERAL ESQUERDO (CONTROLES E LISTAS) -->
+      <aside class="sidebar">
+        
+        <!-- BARRA DE BUSCA E FILTROS -->
+        <section class="search-section card">
+          <div class="card-header">
+            <h3 data-i18n="search_title">Encontrar Clientes em Potencial</h3>
+          </div>
+          <div class="card-body">
+            <!-- Campo de Sugestão de Setores (Datalist) -->
+            <div class="form-group">
+              <label for="search-input" data-i18n="search_label">O que você está procurando?</label>
+              <div class="input-with-icon">
+                <i data-lucide="search" class="input-icon"></i>
+                <input type="text" id="search-input" list="sector-suggestions" placeholder="Ex: Arquitetos, Interior Designers..." class="form-input">
+                <datalist id="sector-suggestions">
+                  <option value="Arquitetos">
+                  <option value="Interior Designers">
+                  <option value="Construtores">
+                </datalist>
+              </div>
+            </div>
+            
+            <!-- Campo de Localização -->
+            <div class="form-group">
+              <label for="location-input" data-i18n="location_label">Filtro de Localidade</label>
+              <div class="input-with-icon">
+                <i data-lucide="map-pin" class="input-icon"></i>
+                <input type="text" id="location-input" placeholder="Estado, Cidade ou CEP" class="form-input">
+              </div>
+            </div>
+
+            <!-- Botão Buscar -->
+            <button id="btn-search" class="btn btn-primary btn-block">
+              <i data-lucide="search"></i>
+              <span data-i18n="btn_search">Buscar no Google Maps</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- NAVEGAÇÃO ENTRE ABAS DA SIDEBAR -->
+        <nav class="sidebar-tabs">
+          <button class="tab-link active" data-tab="tab-prospects">
+            <i data-lucide="compass"></i>
+            <span data-i18n="tab_prospects">Resultados</span>
+          </button>
+          <button class="tab-link" data-tab="tab-visitas">
+            <i data-lucide="check-square"></i>
+            <span data-i18n="tab_visitas">Visitas</span>
+          </button>
+          <button id="tab-admin-btn" class="tab-link hidden" data-tab="tab-admin">
+            <i data-lucide="shield-check"></i>
+            <span data-i18n="tab_admin">Painel</span>
+          </button>
+        </nav>
+
+        <!-- CONTEÚDO DAS ABAS -->
+        <div class="tab-content-container">
+          
+          <!-- ABA 1: PROSPECTS DA BUSCA ATUAL -->
+          <div id="tab-prospects" class="tab-panel active">
+            <div class="panel-header">
+              <h4 data-i18n="results_title">Clientes Encontrados</h4>
+              <span id="results-count" class="badge">0</span>
+            </div>
+            <div id="prospects-list" class="list-container">
+              <div class="empty-state">
+                <i data-lucide="map"></i>
+                <p data-i18n="empty_prospects">Digite um termo e busque para carregar os prospects.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ABA 2: VISITAS CADASTRADAS NO FIRESTORE -->
+          <div id="tab-visitas" class="tab-panel">
+            <div class="panel-header">
+              <h4 data-i18n="saved_title">Visitas Registradas</h4>
+              <button id="btn-export-pdf" class="btn btn-outline btn-sm">
+                <i data-lucide="file-text"></i>
+                <span data-i18n="btn_pdf">Gerar PDF</span>
+              </button>
+            </div>
+            
+            <!-- Filtro de Status das Visitas -->
+            <div class="filter-status-container">
+              <select id="filter-visit-status" class="form-select text-xs">
+                <option value="all" data-i18n="status_all">Todos os Status</option>
+                <option value="A Visitar" data-i18n="status_to_visit">🟡 A Visitar</option>
+                <option value="Visitado" data-i18n="status_visited">🟢 Visitado</option>
+                <option value="Potencial" data-i18n="status_potential">🔵 Potencial</option>
+                <option value="Revisitar" data-i18n="status_revisit">🟠 Revisitar</option>
+                <option value="Desativada/Mudou" data-i18n="status_inactive">🔴 Desativada/Mudou</option>
+              </select>
+            </div>
+
+            <div id="visitas-list" class="list-container">
+              <div class="empty-state">
+                <i data-lucide="check-square"></i>
+                <p data-i18n="empty_visitas">Nenhuma visita registrada no CRM ainda.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
+          <div id="tab-admin" class="tab-panel">
+            <div class="panel-header">
+              <h4 data-i18n="admin_panel_title">Controle de Acessos</h4>
+            </div>
+            <p class="panel-desc" data-i18n="admin_panel_desc">Gerencie os acessos e permissões dos usuários do D2 Group CRM.</p>
+            
+            <div class="admin-users-table-container">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="th_user">Usuário</th>
+                    <th data-i18n="th_role">Acesso</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-list">
+                  <!-- Carregado via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- ÁREA DO MAPA (GOOGLE MAPS) -->
+      <section class="map-wrapper">
+        <div id="map"></div>
+        
+        <!-- Legenda rápida no mapa -->
+        <div class="map-legend">
+          <div class="legend-item"><span class="legend-dot status-to-visit" style="background-color: #facc15;"></span> <span data-i18n="status_to_visit_short">A Visitar</span></div>
+          <div class="legend-item"><span class="legend-dot status-visited" style="background-color: #22c55e;"></span> <span data-i18n="status_visited_short">Visitado</span></div>
+          <div class="legend-item"><span class="legend-dot status-potential" style="background-color: #3b82f6;"></span> <span data-i18n="status_potential_short">Potencial</span></div>
+          <div class="legend-item"><span class="legend-dot status-revisit" style="background-color: #f97316;"></span> <span data-i18n="status_revisit_short">Revisitar</span></div>
+          <div class="legend-item"><span class="legend-dot status-inactive" style="background-color: #ef4444;"></span> <span data-i18n="status_inactive_short">Desativada</span></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- MODAL DE CRM FLUTUANTE (DADOS DO PROSPECT/VISITA) -->
+    <div id="crm-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 data-i18n="crm_modal_title">Detalhes da Prospecção</h3>
+          <button id="btn-close-modal" class="btn btn-icon-only">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          
+          <!-- Dados do Estabelecimento (Fixos do Google Places) -->
+          <div class="place-info-box">
+            <h4 id="crm-place-name">Nome do Estabelecimento</h4>
+            <p class="info-line">
+              <i data-lucide="map-pin"></i>
+              <span id="crm-place-address">Endereço do Local</span>
+            </p>
+            <p class="info-line">
+              <i data-lucide="phone"></i>
+              <span id="crm-place-phone">Telefone</span>
+            </p>
+          </div>
+
+          <!-- Formulário do CRM (Campos Editáveis) -->
+          <form id="crm-form" class="crm-form">
+            <!-- Decisor -->
+            <div class="form-group">
+              <label for="crm-contact-name" data-i18n="crm_contact_name">Nome do Contato / Decisor</label>
+              <input type="text" id="crm-contact-name" placeholder="Ex: Diretor, Gerente de Vendas" class="form-input">
+            </div>
+
+            <!-- Email -->
+            <div class="form-group">
+              <label for="crm-contact-email" data-i18n="crm_contact_email">E-mail de Contato</label>
+              <input type="email" id="crm-contact-email" placeholder="contato@empresa.com" class="form-input">
+            </div>
+
+            <!-- Status de Visita (Agora com design limpo e bolinhas) -->
+            <div class="form-group">
+              <label for="crm-visit-status" data-i18n="crm_visit_status">Status da Visita</label>
+              <select id="crm-visit-status" class="form-select">
+                <option value="A Visitar" data-i18n="status_to_visit">🟡 A Visitar</option>
+                <option value="Visitado" data-i18n="status_visited">🟢 Visitado</option>
+                <option value="Potencial" data-i18n="status_potential">🔵 Potencial</option>
+                <option value="Revisitar" data-i18n="status_revisit">🟠 Revisitar</option>
+                <option value="Desativada/Mudou" data-i18n="status_inactive">🔴 Desativada/Mudou</option>
+              </select>
+            </div>
+
+            <!-- Notas da Visita -->
+            <div class="form-group">
+              <label for="crm-visit-notes" data-i18n="crm_visit_notes">Notas da Visita</label>
+              <textarea id="crm-visit-notes" rows="3" placeholder="Insira detalhes sobre a conversa, objeções ou propostas feitas..." class="form-textarea"></textarea>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="form-actions">
+              <button type="button" id="btn-cancel-crm" class="btn btn-outline" data-i18n="btn_cancel">Cancelar</button>
+              <button type="submit" id="btn-save-crm" class="btn btn-primary">
+                <i data-lucide="save"></i>
+                <span data-i18n="btn_save_visit">Salvar Visita</span>
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SCRIPT DO GOOGLE MAPS API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZAb45gszfHKof0xWv3s4J1UXNjpUBfs0&libraries=places&callback=initMap" async defer></script>
+
+  <!-- Lógica da Aplicação -->
+  <script src="app.js"></script>
+</body>
+</html>
