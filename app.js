@@ -195,6 +195,26 @@ function changeLanguage(lang) {
   });
 }
 
+// Helper para converter Tipos do Google
+function formatPlaceType(typesArray) {
+  if (!typesArray || typesArray.length === 0) return "Desconhecido";
+  const mainType = typesArray[0];
+  const typeMap = {
+    'car_dealer': 'Concessionária',
+    'architect': 'Arquiteto',
+    'general_contractor': 'Empreiteira',
+    'real_estate_agency': 'Imobiliária',
+    'store': 'Loja',
+    'home_goods_store': 'Loja de Artigos',
+    'electronics_store': 'Eletrônicos',
+    'furniture_store': 'Móveis',
+    'point_of_interest': 'Ponto de Interesse',
+    'establishment': 'Estabelecimento'
+  };
+  if (typeMap[mainType]) return typeMap[mainType];
+  return mainType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
 // ==========================================================================
 // 2. CONEXÃO FIREBASE
 // ==========================================================================
@@ -231,6 +251,7 @@ let currentMarkers = {};
 let infoWindow;          
 let searchResults = []; 
 let savedVisits = {};   
+let blacklistedPlaces = {}; 
 let loggedInUser = null;
 let isSuperAdmin = false;
 let currentSelectedProspect = null;
@@ -300,6 +321,7 @@ if (auth) {
       document.getElementById("user-name").textContent = user.displayName || user.email;
 
       await syncUserRecord(user);
+      listenToBlacklist();
     } else {
       loggedInUser = null;
       isSuperAdmin = false;
@@ -363,8 +385,22 @@ document.getElementById("btn-logout").addEventListener("click", () => {
 });
 
 // ==========================================================================
-// 6. BUSCA E RENDERIZAÇÃO DE PROSPECTS
+// 6. BUSCA E RENDERIZAÇÃO DE PROSPECTS (COM FILTRO E CATEGORIA)
 // ==========================================================================
+
+function listenToBlacklist() {
+  if (!db) return;
+  db.collection("blacklist").onSnapshot(snapshot => {
+    blacklistedPlaces = {};
+    snapshot.forEach(doc => {
+      blacklistedPlaces[doc.id] = doc.data();
+    });
+    
+    // Atualiza listas em tempo real caso um admin restaure ou alguém oculte
+    if (searchResults.length > 0) renderProspectsList();
+    if (isSuperAdmin) renderBlacklistTable();
+  });
+}
 
 document.getElementById("btn-search").addEventListener("click", performPlacesSearch);
 
@@ -396,7 +432,8 @@ function performPlacesSearch() {
         phone: place.formatted_phone_number || "",
         lat: place.geometry.location.lat(),
         lng: place.geometry.location.lng(),
-        rating: place.rating || 0
+        rating: place.rating || 0,
+        types: place.types || []
       }));
 
       renderMapPins();
@@ -416,9 +453,12 @@ function renderProspectsList() {
   const countBadge = document.getElementById("results-count");
   
   container.innerHTML = "";
-  countBadge.textContent = searchResults.length;
+  
+  // O filtro automático!
+  const visibleProspects = searchResults.filter(p => !blacklistedPlaces[p.id]);
+  countBadge.textContent = visibleProspects.length;
 
-  if (searchResults.length === 0) {
+  if (visibleProspects.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <i data-lucide="map"></i>
@@ -428,13 +468,14 @@ function renderProspectsList() {
     return;
   }
 
-  searchResults.forEach(prospect => {
+  visibleProspects.forEach(prospect => {
     const card = document.createElement("div");
     card.className = "list-item-card";
     card.id = `prospect-card-${prospect.id}`;
     card.style.display = "flex";
     card.style.alignItems = "flex-start";
     card.style.gap = "12px";
+    card.style.position = "relative"; 
     
     const savedVisit = savedVisits[prospect.id];
     let statusDotHtml = "";
@@ -444,6 +485,8 @@ function renderProspectsList() {
     }
 
     const isChecked = selectedRoutePlaces.some(p => p.id === prospect.id) ? "checked" : "";
+    const categoryStr = formatPlaceType(prospect.types);
+    const ratingStr = prospect.rating ? `⭐ ${prospect.rating}` : `⭐ N/A`;
 
     card.innerHTML = `
       <div style="padding-top: 4px;">
@@ -451,10 +494,40 @@ function renderProspectsList() {
       </div>
       <div style="flex: 1; cursor: pointer; position: relative;" class="visit-card-content">
         ${statusDotHtml}
-        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 15px;">${prospect.name}</h5>
+        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 35px;">${prospect.name}</h5>
+        
+        <!-- Bloco de Resumo Refinado -->
+        <div style="display:flex; gap: 8px; margin-bottom: 4px; font-size: 0.75rem; color: #64748b;">
+          <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${categoryStr}</span>
+          <span style="background: #fef9c3; color: #a16207; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${ratingStr}</span>
+        </div>
+        
         <p class="item-detail" style="margin:0; font-size: 0.8rem; color: #64748b;"><i data-lucide="map-pin"></i> <span>${prospect.address}</span></p>
       </div>
+      
+      <!-- Botão da Lixeira -->
+      <button class="btn-discard" data-id="${prospect.id}" title="Ocultar para a equipe" style="background:none; border:none; color:#ef4444; cursor:pointer; padding:4px; position:absolute; top:8px; right:8px;">
+        <i data-lucide="trash-2" style="width:16px; height:16px;"></i>
+      </button>
     `;
+
+    // Ação da Lixeira (Oculta e grava na Blacklist)
+    const discardBtn = card.querySelector(".btn-discard");
+    discardBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if(confirm(`Tem certeza que deseja ocultar "${prospect.name}" para toda a equipe?`)) {
+        try {
+          await db.collection("blacklist").doc(prospect.id).set({
+            placeName: prospect.name,
+            deletedByUid: loggedInUser.uid,
+            deletedByName: loggedInUser.displayName || loggedInUser.email,
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(error) {
+          console.error("Erro ao descartar:", error);
+        }
+      }
+    });
 
     const checkbox = card.querySelector(".route-checkbox");
     checkbox.addEventListener("change", (e) => {
@@ -571,7 +644,7 @@ function renderVisitasList() {
     const quickVisitBtn = card.querySelector('.btn-quick-visit');
     if (quickVisitBtn) {
       quickVisitBtn.addEventListener('click', async (e) => {
-        e.stopPropagation(); // Impede a abertura do modal
+        e.stopPropagation(); 
         try {
           await db.collection("visitas").doc(visit.placeId).update({
             status: "Visitado",
@@ -672,7 +745,9 @@ function renderMapPins() {
   Object.values(currentMarkers).forEach(marker => marker.setMap(null));
   currentMarkers = {};
 
-  searchResults.forEach(prospect => {
+  const visibleProspects = searchResults.filter(p => !blacklistedPlaces[p.id]);
+
+  visibleProspects.forEach(prospect => {
     const isSaved = savedVisits[prospect.id];
     const markerColor = isSaved ? getStatusHexColor(isSaved.status) : "#475569"; 
 
@@ -751,14 +826,12 @@ const crmForm = document.getElementById("crm-form");
 function openCrmModal(prospect) {
   currentSelectedProspect = prospect;
   
-  // DOM Elements
   document.getElementById("crm-place-name").textContent = prospect.name;
   document.getElementById("crm-place-address").textContent = prospect.address;
   const phoneInput = document.getElementById("crm-place-phone");
   const ratingContainer = document.getElementById("crm-place-rating");
   const actionLinks = document.getElementById("crm-action-links");
   
-  // Limpeza de UI e Setup de Loading
   phoneInput.value = prospect.phone || "";
   ratingContainer.innerHTML = "";
   actionLinks.innerHTML = `<span style="font-size:0.8rem; color:#64748b; display:flex; align-items:center; gap:4px;"><i data-lucide="loader-2" class="lucide-spin" style="width:14px; height:14px;"></i> Buscando dados do Google...</span>`;
@@ -769,7 +842,6 @@ function openCrmModal(prospect) {
   document.getElementById("crm-visit-status").value = "A Visitar";
   document.getElementById("crm-visit-notes").value = "";
 
-  // Sobrescreve com dados do Firestore (se já for cliente salvo)
   if (savedVisits[prospect.id]) {
     const historicalData = savedVisits[prospect.id];
     phoneInput.value = historicalData.placePhone || phoneInput.value;
@@ -779,27 +851,23 @@ function openCrmModal(prospect) {
     document.getElementById("crm-visit-notes").value = historicalData.visitNotes || "";
   }
 
-  // Chamada Profunda Google Places API
   const request = {
     placeId: prospect.id,
     fields: ['formatted_phone_number', 'website', 'rating', 'url']
   };
 
   placesService.getDetails(request, (place, status) => {
-    actionLinks.innerHTML = ""; // Limpa o "Buscando..."
+    actionLinks.innerHTML = ""; 
     
     if (status === google.maps.places.PlacesServiceStatus.OK) {
-      // Telefone
       if (place.formatted_phone_number && (!phoneInput.value || phoneInput.value === prospect.phone)) {
         phoneInput.value = place.formatted_phone_number;
       }
       
-      // Avaliações
       if (place.rating) {
         ratingContainer.innerHTML = `⭐ ${place.rating}`;
       }
       
-      // Botões de Inteligência
       if (place.website || place.url) {
         let linksHtml = '';
         if (place.website) {
@@ -863,7 +931,7 @@ crmForm.addEventListener("submit", async (e) => {
 });
 
 // ==========================================================================
-// 10. PAINEL ADMINISTRATIVO
+// 10. PAINEL ADMINISTRATIVO E GERENCIAMENTO DE BLACKLIST
 // ==========================================================================
 
 let usersListenerUnsubscribe = null;
@@ -911,6 +979,42 @@ function listenToAllUsers() {
       }
       listContainer.appendChild(tr);
     });
+  });
+}
+
+function renderBlacklistTable() {
+  const container = document.getElementById("admin-blacklist-list");
+  if(!container) return;
+  container.innerHTML = "";
+  
+  const list = Object.entries(blacklistedPlaces);
+  if (list.length === 0) {
+    container.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#64748b; padding:15px;">A Lixeira está vazia.</td></tr>`;
+    return;
+  }
+
+  list.forEach(([placeId, data]) => {
+    const tr = document.createElement("tr");
+    const dateStr = data.deletedAt ? new Date(data.deletedAt.toDate()).toLocaleDateString() : 'N/A';
+    
+    tr.innerHTML = `
+      <td>
+        <div style="display:flex; flex-direction:column;">
+          <b>${data.placeName}</b>
+          <span style="font-size: 0.75rem; color: #64748b;">Descartado por: ${data.deletedByName} em ${dateStr}</span>
+        </div>
+      </td>
+      <td style="text-align:right;">
+        <button class="btn btn-outline btn-sm btn-restore" data-id="${placeId}" style="color: #10b981; border-color: #10b981; font-size:0.75rem; padding:4px 8px;">Restaurar</button>
+      </td>
+    `;
+    
+    tr.querySelector('.btn-restore').addEventListener('click', async () => {
+      if(confirm(`Deseja restaurar "${data.placeName}" para as buscas da equipe?`)) {
+        await db.collection("blacklist").doc(placeId).delete();
+      }
+    });
+    container.appendChild(tr);
   });
 }
 
@@ -1037,6 +1141,11 @@ document.querySelectorAll(".tab-link").forEach(tabLink => {
     tabLink.classList.add("active");
     const targetPanelId = tabLink.getAttribute("data-tab");
     document.getElementById(targetPanelId).classList.add("active");
+    
+    // Se abriu a aba Admin, força a renderização da lixeira
+    if(targetPanelId === "tab-admin" && isSuperAdmin) {
+      renderBlacklistTable();
+    }
   });
 });
 
@@ -1082,7 +1191,6 @@ function handleRouteSelection(isChecked, placeData) {
   if (selectedRoutePlaces.length > 0) {
     actionBar.style.display = "flex";
     if(countSpan) countSpan.textContent = selectedRoutePlaces.length;
-    // Reseta métricas ao alterar os pontos
     metricsDisplay.style.display = "none";
     metricsDisplay.innerHTML = "";
   } else {
@@ -1129,9 +1237,8 @@ document.getElementById("btn-draw-route")?.addEventListener("click", () => {
     if (status === "OK") {
       directionsRenderer.setDirections(response);
       
-      // Lógica de Extração de Tempo e Distância
-      let totalDistance = 0; // Metros
-      let totalDuration = 0; // Segundos
+      let totalDistance = 0; 
+      let totalDuration = 0; 
       const legs = response.routes[0].legs;
       
       for (let i = 0; i < legs.length; ++i) {

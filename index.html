@@ -169,13 +169,15 @@
             </div>
           </div>
 
+          <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
           <div id="tab-admin" class="tab-panel">
+            
+            <!-- Controle de Usuários -->
             <div class="panel-header">
               <h4 data-i18n="admin_panel_title">Controle de Acessos</h4>
             </div>
             <p class="panel-desc" data-i18n="admin_panel_desc">Gerencie os acessos e permissões dos usuários do D2 Group CRM.</p>
-            
-            <div class="admin-users-table-container">
+            <div class="admin-users-table-container" style="margin-bottom: 30px;">
               <table class="admin-table">
                 <thead>
                   <tr>
@@ -187,17 +189,36 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Controle da Lixeira / Blacklist -->
+            <div class="panel-header">
+              <h4>Lixeira de Prospecção (Falsos Positivos)</h4>
+            </div>
+            <p class="panel-desc">Locais ocultados pela equipe para não poluírem as rotas de visitas.</p>
+            <div class="admin-users-table-container">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Local Descartado</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-blacklist-list">
+                </tbody>
+              </table>
+            </div>
+
           </div>
 
         </div>
 
-        <!-- BARRA FLUTUANTE DE ROTA (Otimizada) -->
+        <!-- BARRA FLUTUANTE DE ROTA -->
         <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
             <span style="font-size: 0.95rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
             <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
           </div>
-          <!-- Visor de Distância e Tempo (Inicia vazio) -->
+          <!-- Visor de Distância e Tempo -->
           <div id="route-metrics" style="font-size: 0.8rem; color: #38bdf8; font-weight: 500; display: none;"></div>
           
           <div style="display: flex; gap: 10px;">
@@ -225,7 +246,7 @@
 
     </main>
 
-    <!-- MODAL DE CRM FLUTUANTE (DADOS PROFUNDOS) -->
+    <!-- MODAL DE CRM FLUTUANTE -->
     <div id="crm-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -244,7 +265,6 @@
               <i data-lucide="map-pin"></i>
               <span id="crm-place-address">Endereço do Local</span>
             </p>
-            <!-- Container Dinâmico de Links (Site, Reviews, Loader) -->
             <div id="crm-action-links" style="display: flex; gap: 8px; margin-top: 12px; margin-bottom: 4px;"></div>
           </div>
           <form id="crm-form" class="crm-form">
