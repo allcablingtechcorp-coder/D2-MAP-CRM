@@ -252,6 +252,8 @@ function initMap() {
 
   placesService = new google.maps.places.PlacesService(map);
   infoWindow = new google.maps.InfoWindow(); // Inicializa janela única de informações
+  
+  initRoutingServices(); // Inicia os serviços de rota (Adicionado na V2)
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -470,7 +472,7 @@ function renderProspectsList() {
 }
 
 // ==========================================================================
-// 7. SINCRONIZAÇÃO FIRESTORE REAL-TIME
+// 7. SINCRONIZAÇÃO FIRESTORE & RENDERIZAÇÃO DA LISTA DE VISITAS
 // ==========================================================================
 
 function listenToVisitas() {
@@ -518,17 +520,36 @@ function renderVisitasList() {
 
   visitsArray.forEach(visit => {
     const card = document.createElement("div");
-    const statusClass = getStatusClass(visit.status);
     card.className = "list-item-card";
+    card.style.display = "flex";
+    card.style.alignItems = "flex-start";
+    card.style.gap = "12px";
     
+    // Verifica se já está selecionado na rota
+    const isChecked = selectedRoutePlaces.some(p => p.id === visit.placeId) ? "checked" : "";
+    const statusClass = getStatusClass(visit.status);
+
     card.innerHTML = `
-      <span class="item-badge-status ${statusClass}"></span>
-      <h5 class="item-title">${visit.placeName}</h5>
-      <p class="item-detail"><i data-lucide="map-pin"></i> <span>${visit.placeAddress}</span></p>
-      <p class="item-detail"><i data-lucide="user"></i> <span><b>Decisor:</b> ${visit.contactName || '---'}</span></p>
-      ${visit.visitNotes ? `<p class="item-detail mt-1"><i>"${visit.visitNotes.substring(0,60)}..."</i></p>` : ''}
+      <div style="padding-top: 4px;">
+        <input type="checkbox" class="route-checkbox" data-id="${visit.placeId}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked}>
+      </div>
+      <div style="flex: 1; cursor: pointer; position: relative;" class="visit-card-content">
+        <span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>
+        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 15px;">${visit.placeName}</h5>
+        <p class="item-detail" style="margin:0; font-size: 0.8rem; color: #64748b;"><i data-lucide="map-pin"></i> ${visit.placeAddress}</p>
+        <p class="item-detail" style="margin:4px 0 0 0; font-size: 0.75rem;"><i data-lucide="user"></i> <b>Decisor:</b> ${visit.contactName || '---'}</p>
+        <p class="item-detail" style="margin:4px 0 0 0; font-size: 0.75rem;">Status: <b>${visit.status}</b></p>
+      </div>
     `;
 
+    // Evento do Checkbox de Rota (Isolado do card)
+    const checkbox = card.querySelector(".route-checkbox");
+    checkbox.addEventListener("change", (e) => {
+      handleRouteSelection(e.target.checked, visit);
+    });
+
+    // Eventos do Conteúdo do Card (Abre Modal do CRM e Hover no Mapa)
+    const contentArea = card.querySelector(".visit-card-content");
     const prospectObj = {
       id: visit.placeId,
       name: visit.placeName,
@@ -538,9 +559,9 @@ function renderVisitasList() {
       lng: visit.lng
     };
 
-    card.addEventListener("click", () => openCrmModal(prospectObj));
+    contentArea.addEventListener("click", () => openCrmModal(prospectObj));
 
-    card.addEventListener("mouseenter", () => {
+    contentArea.addEventListener("mouseenter", () => {
       const marker = currentMarkers[visit.placeId];
       if (marker) {
         marker.setAnimation(google.maps.Animation.BOUNCE);
@@ -548,7 +569,7 @@ function renderVisitasList() {
       }
     });
 
-    card.addEventListener("mouseleave", () => {
+    contentArea.addEventListener("mouseleave", () => {
       const marker = currentMarkers[visit.placeId];
       if (marker) {
         marker.setAnimation(null);
@@ -943,4 +964,94 @@ document.querySelectorAll(".lang-btn").forEach(btn => {
 document.addEventListener("DOMContentLoaded", () => {
   changeLanguage("pt");
   lucide.createIcons();
+});
+
+// ==========================================================================
+// 13. SISTEMA DE ROTEAMENTO (MAPA & GPS)
+// ==========================================================================
+
+let directionsService;
+let directionsRenderer;
+let selectedRoutePlaces = [];
+
+function initRoutingServices() {
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map: map,
+    suppressMarkers: false,
+    polylineOptions: { strokeColor: "#3b82f6", strokeWeight: 5, strokeOpacity: 0.8 }
+  });
+}
+
+function handleRouteSelection(isChecked, visitData) {
+  if (isChecked) {
+    selectedRoutePlaces.push({ id: visitData.placeId, name: visitData.placeName, lat: visitData.lat, lng: visitData.lng });
+  } else {
+    selectedRoutePlaces = selectedRoutePlaces.filter(p => p.id !== visitData.placeId);
+  }
+
+  const actionBar = document.getElementById("route-action-bar");
+  const countSpan = document.getElementById("route-count");
+
+  if (selectedRoutePlaces.length > 0) {
+    actionBar.style.display = "flex";
+    if(countSpan) countSpan.textContent = selectedRoutePlaces.length;
+  } else {
+    actionBar.style.display = "none";
+    if (directionsRenderer) directionsRenderer.setDirections({routes: []});
+  }
+}
+
+document.getElementById("btn-clear-route")?.addEventListener("click", () => {
+  selectedRoutePlaces = [];
+  renderVisitasList(); 
+  document.getElementById("route-action-bar").style.display = "none";
+  if (directionsRenderer) directionsRenderer.setDirections({routes: []});
+});
+
+document.getElementById("btn-draw-route")?.addEventListener("click", () => {
+  if (selectedRoutePlaces.length < 2) {
+    alert("Selecione pelo menos 2 locais para traçar uma rota no mapa.");
+    return;
+  }
+  
+  if (!directionsService) initRoutingServices();
+
+  const origin = { lat: selectedRoutePlaces[0].lat, lng: selectedRoutePlaces[0].lng };
+  const destination = { lat: selectedRoutePlaces[selectedRoutePlaces.length - 1].lat, lng: selectedRoutePlaces[selectedRoutePlaces.length - 1].lng };
+  
+  const waypoints = selectedRoutePlaces.slice(1, -1).map(place => ({
+    location: { lat: place.lat, lng: place.lng },
+    stopover: true
+  }));
+
+  directionsService.route({
+    origin: origin,
+    destination: destination,
+    waypoints: waypoints,
+    optimizeWaypoints: true, 
+    travelMode: google.maps.TravelMode.DRIVING
+  }, (response, status) => {
+    if (status === "OK") {
+      directionsRenderer.setDirections(response);
+    } else {
+      alert("Não foi possível calcular a rota: " + status);
+    }
+  });
+});
+
+document.getElementById("btn-gps-route")?.addEventListener("click", () => {
+  if (selectedRoutePlaces.length === 0) return;
+
+  const baseUrl = "https://www.google.com/maps/dir/?api=1";
+  const destinationPlace = selectedRoutePlaces[selectedRoutePlaces.length - 1];
+  
+  let url = `${baseUrl}&destination=${destinationPlace.lat},${destinationPlace.lng}`;
+
+  if (selectedRoutePlaces.length > 1) {
+    const waypointsArray = selectedRoutePlaces.slice(0, -1).map(p => `${p.lat},${p.lng}`);
+    url += `&waypoints=${waypointsArray.join('|')}`;
+  }
+
+  window.open(url, "_blank");
 });

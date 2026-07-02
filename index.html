@@ -160,7 +160,7 @@
           </div>
 
           <!-- ABA 2: VISITAS CADASTRADAS NO FIRESTORE -->
-          <div id="tab-visitas" class="tab-panel">
+          <div id="tab-visitas" class="tab-panel" style="position: relative;">
             <div class="panel-header">
               <h4 data-i18n="saved_title">Visitas Registradas</h4>
               <button id="btn-export-pdf" class="btn btn-outline btn-sm">
@@ -181,12 +181,30 @@
               </select>
             </div>
 
-            <div id="visitas-list" class="list-container">
+            <!-- Ajuste de padding-bottom para que a lista não fique escondida atrás da barra flutuante -->
+            <div id="visitas-list" class="list-container" style="padding-bottom: 90px;">
               <div class="empty-state">
                 <i data-lucide="check-square"></i>
                 <p data-i18n="empty_visitas">Nenhuma visita registrada no CRM ainda.</p>
               </div>
             </div>
+
+            <!-- NOVA BARRA FLUTUANTE DE ROTA (Inicia Oculta) -->
+            <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
+                <span style="font-size: 0.9rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
+                <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
+              </div>
+              <div style="display: flex; gap: 10px;">
+                <button id="btn-draw-route" class="btn btn-outline" style="flex: 1; border-color: #475569; color: white; padding: 8px;">
+                  🗺️ Ver no Mapa
+                </button>
+                <button id="btn-gps-route" class="btn btn-primary" style="flex: 1; padding: 8px;">
+                  📱 Abrir GPS
+                </button>
+              </div>
+            </div>
+
           </div>
 
           <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
