@@ -26,7 +26,7 @@
 </head>
 <body>
 
-  <!-- CONTAINER PRINCIPAL DE LOGIN (Apenas exibido se não autenticado) -->
+  <!-- CONTAINER PRINCIPAL DE LOGIN -->
   <div id="login-container" class="login-overlay">
     <div class="login-card">
       <div class="login-header">
@@ -42,7 +42,7 @@
     </div>
   </div>
 
-  <!-- CONTAINER DO APP PRINCIPAL (Ocultado até login) -->
+  <!-- CONTAINER DO APP PRINCIPAL -->
   <div id="app-container" class="app-layout hidden">
     
     <!-- BARRA SUPERIOR (HEADER) -->
@@ -56,7 +56,7 @@
       </div>
       
       <div class="header-actions">
-        <!-- Seletor de Idiomas (Agora usando SVGs para garantir funcionamento no Windows) -->
+        <!-- Seletor de Idiomas -->
         <div class="language-selector" style="display: flex; gap: 8px; align-items: center;">
           <button class="lang-btn" data-lang="pt" title="Português" style="background:none; border:none; cursor:pointer;">
             <img src="https://flagcdn.com/w20/br.png" width="24" alt="Brasil" style="border-radius: 2px;">
@@ -86,8 +86,8 @@
     <!-- ÁREA DE CONTEÚDO PRINCIPAL (SPLIT SCREEN) -->
     <main class="main-content">
       
-      <!-- PAINEL LATERAL ESQUERDO (CONTROLES E LISTAS) -->
-      <aside class="sidebar">
+      <!-- PAINEL LATERAL ESQUERDO (Aviso: Adicionado position: relative aqui) -->
+      <aside class="sidebar" style="position: relative;">
         
         <!-- BARRA DE BUSCA E FILTROS -->
         <section class="search-section card">
@@ -95,7 +95,6 @@
             <h3 data-i18n="search_title">Encontrar Clientes em Potencial</h3>
           </div>
           <div class="card-body">
-            <!-- Campo de Sugestão de Setores (Datalist) -->
             <div class="form-group">
               <label for="search-input" data-i18n="search_label">O que você está procurando?</label>
               <div class="input-with-icon">
@@ -109,7 +108,6 @@
               </div>
             </div>
             
-            <!-- Campo de Localização -->
             <div class="form-group">
               <label for="location-input" data-i18n="location_label">Filtro de Localidade</label>
               <div class="input-with-icon">
@@ -118,7 +116,6 @@
               </div>
             </div>
 
-            <!-- Botão Buscar -->
             <button id="btn-search" class="btn btn-primary btn-block">
               <i data-lucide="search"></i>
               <span data-i18n="btn_search">Buscar no Google Maps</span>
@@ -151,7 +148,8 @@
               <h4 data-i18n="results_title">Clientes Encontrados</h4>
               <span id="results-count" class="badge">0</span>
             </div>
-            <div id="prospects-list" class="list-container">
+            <!-- Lista com padding para não esconder atrás da barra de rota -->
+            <div id="prospects-list" class="list-container" style="padding-bottom: 90px;">
               <div class="empty-state">
                 <i data-lucide="map"></i>
                 <p data-i18n="empty_prospects">Digite um termo e busque para carregar os prospects.</p>
@@ -160,7 +158,7 @@
           </div>
 
           <!-- ABA 2: VISITAS CADASTRADAS NO FIRESTORE -->
-          <div id="tab-visitas" class="tab-panel" style="position: relative;">
+          <div id="tab-visitas" class="tab-panel">
             <div class="panel-header">
               <h4 data-i18n="saved_title">Visitas Registradas</h4>
               <button id="btn-export-pdf" class="btn btn-outline btn-sm">
@@ -169,7 +167,6 @@
               </button>
             </div>
             
-            <!-- Filtro de Status das Visitas -->
             <div class="filter-status-container">
               <select id="filter-visit-status" class="form-select text-xs">
                 <option value="all" data-i18n="status_all">Todos os Status</option>
@@ -181,30 +178,13 @@
               </select>
             </div>
 
-            <!-- Ajuste de padding-bottom para que a lista não fique escondida atrás da barra flutuante -->
+            <!-- Lista com padding para não esconder atrás da barra de rota -->
             <div id="visitas-list" class="list-container" style="padding-bottom: 90px;">
               <div class="empty-state">
                 <i data-lucide="check-square"></i>
                 <p data-i18n="empty_visitas">Nenhuma visita registrada no CRM ainda.</p>
               </div>
             </div>
-
-            <!-- NOVA BARRA FLUTUANTE DE ROTA (Inicia Oculta) -->
-            <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
-                <span style="font-size: 0.9rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
-                <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
-              </div>
-              <div style="display: flex; gap: 10px;">
-                <button id="btn-draw-route" class="btn btn-outline" style="flex: 1; border-color: #475569; color: white; padding: 8px;">
-                  🗺️ Ver no Mapa
-                </button>
-                <button id="btn-gps-route" class="btn btn-primary" style="flex: 1; padding: 8px;">
-                  📱 Abrir GPS
-                </button>
-              </div>
-            </div>
-
           </div>
 
           <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
@@ -230,13 +210,28 @@
           </div>
 
         </div>
+
+        <!-- BARRA FLUTUANTE DE ROTA MOVIDA PARA COBRIR TODAS AS ABAS -->
+        <div id="route-action-bar" style="display: none; position: absolute; bottom: 0; left: 0; width: 100%; background: #1e293b; padding: 15px; box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 1px solid #334155; z-index: 50; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
+            <span style="font-size: 0.9rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
+            <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button id="btn-draw-route" class="btn btn-outline" style="flex: 1; border-color: #475569; color: white; padding: 8px;">
+              🗺️ Ver no Mapa
+            </button>
+            <button id="btn-gps-route" class="btn btn-primary" style="flex: 1; padding: 8px;">
+              📱 Abrir GPS
+            </button>
+          </div>
+        </div>
+
       </aside>
 
       <!-- ÁREA DO MAPA (GOOGLE MAPS) -->
       <section class="map-wrapper">
         <div id="map"></div>
-        
-        <!-- Legenda rápida no mapa -->
         <div class="map-legend">
           <div class="legend-item"><span class="legend-dot status-to-visit" style="background-color: #facc15;"></span> <span data-i18n="status_to_visit_short">A Visitar</span></div>
           <div class="legend-item"><span class="legend-dot status-visited" style="background-color: #22c55e;"></span> <span data-i18n="status_visited_short">Visitado</span></div>
@@ -248,7 +243,7 @@
 
     </main>
 
-    <!-- MODAL DE CRM FLUTUANTE (DADOS DO PROSPECT/VISITA) -->
+    <!-- MODAL DE CRM FLUTUANTE -->
     <div id="crm-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -258,8 +253,6 @@
           </button>
         </div>
         <div class="modal-body">
-          
-          <!-- Dados do Estabelecimento (Fixos do Google Places) -->
           <div class="place-info-box">
             <h4 id="crm-place-name">Nome do Estabelecimento</h4>
             <p class="info-line">
@@ -271,22 +264,15 @@
               <span id="crm-place-phone">Telefone</span>
             </p>
           </div>
-
-          <!-- Formulário do CRM (Campos Editáveis) -->
           <form id="crm-form" class="crm-form">
-            <!-- Decisor -->
             <div class="form-group">
               <label for="crm-contact-name" data-i18n="crm_contact_name">Nome do Contato / Decisor</label>
               <input type="text" id="crm-contact-name" placeholder="Ex: Diretor, Gerente de Vendas" class="form-input">
             </div>
-
-            <!-- Email -->
             <div class="form-group">
               <label for="crm-contact-email" data-i18n="crm_contact_email">E-mail de Contato</label>
               <input type="email" id="crm-contact-email" placeholder="contato@empresa.com" class="form-input">
             </div>
-
-            <!-- Status de Visita (Agora com design limpo e bolinhas) -->
             <div class="form-group">
               <label for="crm-visit-status" data-i18n="crm_visit_status">Status da Visita</label>
               <select id="crm-visit-status" class="form-select">
@@ -297,14 +283,10 @@
                 <option value="Desativada/Mudou" data-i18n="status_inactive">🔴 Desativada/Mudou</option>
               </select>
             </div>
-
-            <!-- Notas da Visita -->
             <div class="form-group">
               <label for="crm-visit-notes" data-i18n="crm_visit_notes">Notas da Visita</label>
-              <textarea id="crm-visit-notes" rows="3" placeholder="Insira detalhes sobre a conversa, objeções ou propostas feitas..." class="form-textarea"></textarea>
+              <textarea id="crm-visit-notes" rows="3" placeholder="Insira detalhes sobre a conversa..." class="form-textarea"></textarea>
             </div>
-
-            <!-- Botões de Ação -->
             <div class="form-actions">
               <button type="button" id="btn-cancel-crm" class="btn btn-outline" data-i18n="btn_cancel">Cancelar</button>
               <button type="submit" id="btn-save-crm" class="btn btn-primary">
@@ -313,17 +295,13 @@
               </button>
             </div>
           </form>
-
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- SCRIPT DO GOOGLE MAPS API -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZAb45gszfHKof0xWv3s4J1UXNjpUBfs0&libraries=places&callback=initMap" async defer></script>
-
-  <!-- Lógica da Aplicação -->
   <script src="app.js"></script>
 </body>
 </html>

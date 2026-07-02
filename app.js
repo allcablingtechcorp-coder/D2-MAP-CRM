@@ -227,8 +227,8 @@ try {
 
 let map;
 let placesService;
-let currentMarkers = {}; // Estrutura em Objeto { placeId: marker } para vinculação direta
-let infoWindow;          // Instância global única de Balão do Mapa
+let currentMarkers = {}; 
+let infoWindow;          
 let searchResults = []; 
 let savedVisits = {};   
 let loggedInUser = null;
@@ -240,7 +240,7 @@ let currentSelectedProspect = null;
 // ==========================================================================
 
 function initMap() {
-  const defaultLatLng = { lat: 26.2301, lng: -80.1248 }; // Pompano Beach, FL como referência padrão operacional
+  const defaultLatLng = { lat: 26.2301, lng: -80.1248 }; 
   
   map = new google.maps.Map(document.getElementById("map"), {
     center: defaultLatLng,
@@ -251,9 +251,9 @@ function initMap() {
   });
 
   placesService = new google.maps.places.PlacesService(map);
-  infoWindow = new google.maps.InfoWindow(); // Inicializa janela única de informações
+  infoWindow = new google.maps.InfoWindow(); 
   
-  initRoutingServices(); // Inicia os serviços de rota (Adicionado na V2)
+  initRoutingServices(); 
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -363,7 +363,7 @@ document.getElementById("btn-logout").addEventListener("click", () => {
 });
 
 // ==========================================================================
-// 6. BUSCA DE ESTABELECIMENTOS VIA PLACES API
+// 6. BUSCA E RENDERIZAÇÃO DE PROSPECTS (COM CHECKBOX)
 // ==========================================================================
 
 document.getElementById("btn-search").addEventListener("click", performPlacesSearch);
@@ -432,24 +432,47 @@ function renderProspectsList() {
     const card = document.createElement("div");
     card.className = "list-item-card";
     card.id = `prospect-card-${prospect.id}`;
+    card.style.display = "flex";
+    card.style.alignItems = "flex-start";
+    card.style.gap = "12px";
     
     const savedVisit = savedVisits[prospect.id];
     let statusDotHtml = "";
     if (savedVisit) {
       const statusClass = getStatusClass(savedVisit.status);
-      statusDotHtml = `<span class="item-badge-status ${statusClass}"></span>`;
+      statusDotHtml = `<span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>`;
     }
 
+    // Mantém a caixa checada se o local já foi selecionado para rota
+    const isChecked = selectedRoutePlaces.some(p => p.id === prospect.id) ? "checked" : "";
+
     card.innerHTML = `
-      ${statusDotHtml}
-      <h5 class="item-title">${prospect.name}</h5>
-      <p class="item-detail"><i data-lucide="map-pin"></i> <span>${prospect.address}</span></p>
+      <div style="padding-top: 4px;">
+        <input type="checkbox" class="route-checkbox" data-id="${prospect.id}" style="width: 18px; height: 18px; cursor: pointer;" ${isChecked}>
+      </div>
+      <div style="flex: 1; cursor: pointer; position: relative;" class="visit-card-content">
+        ${statusDotHtml}
+        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 15px;">${prospect.name}</h5>
+        <p class="item-detail" style="margin:0; font-size: 0.8rem; color: #64748b;"><i data-lucide="map-pin"></i> <span>${prospect.address}</span></p>
+      </div>
     `;
 
-    // Ações de clique e Hover Integrado
-    card.addEventListener("click", () => openCrmModal(prospect));
+    // Ação do Checkbox para a Rota
+    const checkbox = card.querySelector(".route-checkbox");
+    checkbox.addEventListener("change", (e) => {
+      handleRouteSelection(e.target.checked, { 
+        id: prospect.id, 
+        name: prospect.name, 
+        lat: prospect.lat, 
+        lng: prospect.lng 
+      });
+    });
+
+    // Ações de clique e Hover no Cartão (Abre CRM)
+    const contentArea = card.querySelector(".visit-card-content");
+    contentArea.addEventListener("click", () => openCrmModal(prospect));
     
-    card.addEventListener("mouseenter", () => {
+    contentArea.addEventListener("mouseenter", () => {
       const marker = currentMarkers[prospect.id];
       if (marker) {
         marker.setAnimation(google.maps.Animation.BOUNCE);
@@ -457,7 +480,7 @@ function renderProspectsList() {
       }
     });
 
-    card.addEventListener("mouseleave", () => {
+    contentArea.addEventListener("mouseleave", () => {
       const marker = currentMarkers[prospect.id];
       if (marker) {
         marker.setAnimation(null);
@@ -472,7 +495,7 @@ function renderProspectsList() {
 }
 
 // ==========================================================================
-// 7. SINCRONIZAÇÃO FIRESTORE & RENDERIZAÇÃO DA LISTA DE VISITAS
+// 7. SINCRONIZAÇÃO FIRESTORE E RENDERIZAÇÃO DE VISITAS
 // ==========================================================================
 
 function listenToVisitas() {
@@ -520,14 +543,13 @@ function renderVisitasList() {
 
   visitsArray.forEach(visit => {
     const card = document.createElement("div");
+    const statusClass = getStatusClass(visit.status);
     card.className = "list-item-card";
     card.style.display = "flex";
     card.style.alignItems = "flex-start";
     card.style.gap = "12px";
     
-    // Verifica se já está selecionado na rota
     const isChecked = selectedRoutePlaces.some(p => p.id === visit.placeId) ? "checked" : "";
-    const statusClass = getStatusClass(visit.status);
 
     card.innerHTML = `
       <div style="padding-top: 4px;">
@@ -542,13 +564,16 @@ function renderVisitasList() {
       </div>
     `;
 
-    // Evento do Checkbox de Rota (Isolado do card)
     const checkbox = card.querySelector(".route-checkbox");
     checkbox.addEventListener("change", (e) => {
-      handleRouteSelection(e.target.checked, visit);
+      handleRouteSelection(e.target.checked, { 
+        id: visit.placeId, 
+        name: visit.placeName, 
+        lat: visit.lat, 
+        lng: visit.lng 
+      });
     });
 
-    // Eventos do Conteúdo do Card (Abre Modal do CRM e Hover no Mapa)
     const contentArea = card.querySelector(".visit-card-content");
     const prospectObj = {
       id: visit.placeId,
@@ -629,10 +654,9 @@ function renderMapPins() {
   Object.values(currentMarkers).forEach(marker => marker.setMap(null));
   currentMarkers = {};
 
-  // 1. Renderiza Pins dos Resultados Atuais
   searchResults.forEach(prospect => {
     const isSaved = savedVisits[prospect.id];
-    const markerColor = isSaved ? getStatusHexColor(isSaved.status) : "#475569"; // Slate escuro para não cadastrados
+    const markerColor = isSaved ? getStatusHexColor(isSaved.status) : "#475569"; 
 
     const marker = new google.maps.Marker({
       position: { lat: prospect.lat, lng: prospect.lng },
@@ -648,7 +672,6 @@ function renderMapPins() {
     currentMarkers[prospect.id] = marker;
   });
 
-  // 2. Renderiza Pins de visitas antigas fora da busca atual para persistência visual
   Object.values(savedVisits).forEach(visit => {
     if (!currentMarkers[visit.placeId]) {
       const markerColor = getStatusHexColor(visit.status);
@@ -691,11 +714,11 @@ function getStatusClass(status) {
 
 function getStatusHexColor(status) {
   switch (status) {
-    case "A Visitar": return "#eab308";      // Amarelo
-    case "Visitado": return "#10b981";       // Verde
-    case "Potencial": return "#3b82f6";      // Azul
-    case "Revisitar": return "#f97316";      // Laranja
-    case "Desativada/Mudou": return "#ef4444"; // Vermelho
+    case "A Visitar": return "#eab308";      
+    case "Visitado": return "#10b981";       
+    case "Potencial": return "#3b82f6";      
+    case "Revisitar": return "#f97316";      
+    case "Desativada/Mudou": return "#ef4444"; 
     default: return "#475569";
   }
 }
@@ -983,11 +1006,12 @@ function initRoutingServices() {
   });
 }
 
-function handleRouteSelection(isChecked, visitData) {
+// Lida com a seleção de caixas tanto na aba "Resultados" quanto em "Visitas"
+function handleRouteSelection(isChecked, placeData) {
   if (isChecked) {
-    selectedRoutePlaces.push({ id: visitData.placeId, name: visitData.placeName, lat: visitData.lat, lng: visitData.lng });
+    selectedRoutePlaces.push(placeData);
   } else {
-    selectedRoutePlaces = selectedRoutePlaces.filter(p => p.id !== visitData.placeId);
+    selectedRoutePlaces = selectedRoutePlaces.filter(p => p.id !== placeData.id);
   }
 
   const actionBar = document.getElementById("route-action-bar");
@@ -1004,7 +1028,11 @@ function handleRouteSelection(isChecked, visitData) {
 
 document.getElementById("btn-clear-route")?.addEventListener("click", () => {
   selectedRoutePlaces = [];
+  
+  // Re-renderiza ambas as listas para desmarcar visualmente todas as caixas
   renderVisitasList(); 
+  renderProspectsList();
+  
   document.getElementById("route-action-bar").style.display = "none";
   if (directionsRenderer) directionsRenderer.setDirections({routes: []});
 });
