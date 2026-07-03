@@ -17,6 +17,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
   <link rel="stylesheet" href="style.css">
+  
+  <style>
+    /* Classes extras de status */
+    .status-archived { background-color: #64748b; }
+  </style>
 </head>
 <body>
 
@@ -158,6 +163,7 @@
                 <option value="Potencial" data-i18n="status_potential">🔵 Potencial</option>
                 <option value="Revisitar" data-i18n="status_revisit">🟠 Revisitar</option>
                 <option value="Desativada/Mudou" data-i18n="status_inactive">🔴 Desativada/Mudou</option>
+                <option value="Arquivado" data-i18n="status_archived">📁 Arquivado</option>
               </select>
             </div>
 
@@ -172,7 +178,6 @@
           <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
           <div id="tab-admin" class="tab-panel">
             
-            <!-- Controle de Usuários -->
             <div class="panel-header">
               <h4 data-i18n="admin_panel_title">Controle de Acessos</h4>
             </div>
@@ -190,7 +195,6 @@
               </table>
             </div>
 
-            <!-- Controle da Lixeira / Blacklist -->
             <div class="panel-header">
               <h4>Lixeira de Prospecção (Falsos Positivos)</h4>
             </div>
@@ -218,7 +222,6 @@
             <span style="font-size: 0.95rem; font-weight: 600;"><span id="route-count">0</span> locais selecionados</span>
             <button id="btn-clear-route" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Limpar</button>
           </div>
-          <!-- Visor de Distância e Tempo -->
           <div id="route-metrics" style="font-size: 0.8rem; color: #38bdf8; font-weight: 500; display: none;"></div>
           
           <div style="display: flex; gap: 10px;">
@@ -241,6 +244,7 @@
           <div class="legend-item"><span class="legend-dot status-potential" style="background-color: #3b82f6;"></span> <span data-i18n="status_potential_short">Potencial</span></div>
           <div class="legend-item"><span class="legend-dot status-revisit" style="background-color: #f97316;"></span> <span data-i18n="status_revisit_short">Revisitar</span></div>
           <div class="legend-item"><span class="legend-dot status-inactive" style="background-color: #ef4444;"></span> <span data-i18n="status_inactive_short">Desativada</span></div>
+          <div class="legend-item"><span class="legend-dot status-archived" style="background-color: #64748b;"></span> <span data-i18n="status_archived_short">Arquivado</span></div>
         </div>
       </section>
 
@@ -288,6 +292,7 @@
                 <option value="Potencial" data-i18n="status_potential">🔵 Potencial</option>
                 <option value="Revisitar" data-i18n="status_revisit">🟠 Revisitar</option>
                 <option value="Desativada/Mudou" data-i18n="status_inactive">🔴 Desativada/Mudou</option>
+                <option value="Arquivado" data-i18n="status_archived">📁 Arquivado</option>
               </select>
             </div>
             <div class="form-group">

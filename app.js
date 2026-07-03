@@ -28,11 +28,13 @@ const i18n = {
     status_potential: "Potencial",
     status_revisit: "Revisitar",
     status_inactive: "Desativada/Mudou",
+    status_archived: "Arquivado",
     status_to_visit_short: "A Visitar",
     status_visited_short: "Visitado",
     status_potential_short: "Potencial",
     status_revisit_short: "Revisitar",
     status_inactive_short: "Desativada",
+    status_archived_short: "Arquivado",
     empty_visitas: "Nenhuma visita registrada no CRM ainda.",
     admin_panel_title: "Controle de Acessos",
     admin_panel_desc: "Gerencie os acessos e permissões dos usuários do D2 Group CRM.",
@@ -73,11 +75,13 @@ const i18n = {
     status_potential: "Potential",
     status_revisit: "Revisit",
     status_inactive: "Deactivated/Moved",
+    status_archived: "Archived",
     status_to_visit_short: "To Visit",
     status_visited_short: "Visited",
     status_potential_short: "Potential",
     status_revisit_short: "Revisit",
     status_inactive_short: "Deactivated",
+    status_archived_short: "Archived",
     empty_visitas: "No visits registered in CRM yet.",
     admin_panel_title: "Access Control",
     admin_panel_desc: "Manage roles and permissions of D2 Group CRM users.",
@@ -118,11 +122,13 @@ const i18n = {
     status_potential: "Potencial",
     status_revisit: "Revisitar",
     status_inactive: "Desactivada/Mudó",
+    status_archived: "Archivado",
     status_to_visit_short: "A Visitar",
     status_visited_short: "Visitado",
     status_potential_short: "Potencial",
     status_revisit_short: "Revisitar",
     status_inactive_short: "Desactivada",
+    status_archived_short: "Archivado",
     empty_visitas: "No hay visitas registradas en el CRM todavía.",
     admin_panel_title: "Control de Acceso",
     admin_panel_desc: "Gestione los roles y permisos de los usuarios de D2 Group CRM.",
@@ -195,24 +201,70 @@ function changeLanguage(lang) {
   });
 }
 
-// Helper para converter Tipos do Google
+// ==========================================================================
+// TRATAMENTO INTELIGENTE DE CATEGORIAS DO GOOGLE E STATUS
+// ==========================================================================
 function formatPlaceType(typesArray) {
   if (!typesArray || typesArray.length === 0) return "Desconhecido";
-  const mainType = typesArray[0];
+  
+  const genericTypes = ['establishment', 'point_of_interest', 'store', 'health'];
+  let mainType = typesArray.find(t => !genericTypes.includes(t)) || typesArray[0];
+
   const typeMap = {
-    'car_dealer': 'Concessionária',
     'architect': 'Arquiteto',
-    'general_contractor': 'Empreiteira',
+    'general_contractor': 'Empreiteira / Construtora',
     'real_estate_agency': 'Imobiliária',
-    'store': 'Loja',
-    'home_goods_store': 'Loja de Artigos',
-    'electronics_store': 'Eletrônicos',
-    'furniture_store': 'Móveis',
-    'point_of_interest': 'Ponto de Interesse',
-    'establishment': 'Estabelecimento'
+    'home_goods_store': 'Loja de Casa/Decoração',
+    'electronics_store': 'Áudio & Vídeo / Eletrônicos',
+    'furniture_store': 'Loja de Móveis',
+    'electrician': 'Eletricista',
+    'plumber': 'Encanador / HVAC',
+    'car_dealer': 'Concessionária (Alerta)',
+    'car_repair': 'Oficina Mecânica (Alerta)',
+    'lawyer': 'Advocacia',
+    'accounting': 'Contabilidade',
+    'establishment': 'Empresa Local',
+    'point_of_interest': 'Ponto Comercial'
   };
+  
   if (typeMap[mainType]) return typeMap[mainType];
   return mainType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function getStatusEmoji(status) {
+  switch (status) {
+    case "A Visitar": return "🟡";
+    case "Visitado": return "🟢";
+    case "Potencial": return "🔵";
+    case "Revisitar": return "🟠";
+    case "Desativada/Mudou": return "🔴";
+    case "Arquivado": return "📁";
+    default: return "⚪";
+  }
+}
+
+function getStatusHexColor(status) {
+  switch (status) {
+    case "A Visitar": return "#eab308";      
+    case "Visitado": return "#10b981";       
+    case "Potencial": return "#3b82f6";      
+    case "Revisitar": return "#f97316";      
+    case "Desativada/Mudou": return "#ef4444"; 
+    case "Arquivado": return "#64748b";
+    default: return "#475569";
+  }
+}
+
+function getStatusClass(status) {
+  switch (status) {
+    case "A Visitar": return "status-to-visit";
+    case "Visitado": return "status-visited";
+    case "Potencial": return "status-potential";
+    case "Revisitar": return "status-revisit";
+    case "Desativada/Mudou": return "status-inactive";
+    case "Arquivado": return "status-archived";
+    default: return "";
+  }
 }
 
 // ==========================================================================
@@ -395,8 +447,6 @@ function listenToBlacklist() {
     snapshot.forEach(doc => {
       blacklistedPlaces[doc.id] = doc.data();
     });
-    
-    // Atualiza listas em tempo real caso um admin restaure ou alguém oculte
     if (searchResults.length > 0) renderProspectsList();
     if (isSuperAdmin) renderBlacklistTable();
   });
@@ -454,7 +504,6 @@ function renderProspectsList() {
   
   container.innerHTML = "";
   
-  // O filtro automático!
   const visibleProspects = searchResults.filter(p => !blacklistedPlaces[p.id]);
   countBadge.textContent = visibleProspects.length;
 
@@ -480,8 +529,8 @@ function renderProspectsList() {
     const savedVisit = savedVisits[prospect.id];
     let statusDotHtml = "";
     if (savedVisit) {
-      const statusClass = getStatusClass(savedVisit.status);
-      statusDotHtml = `<span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>`;
+      const emoji = getStatusEmoji(savedVisit.status);
+      statusDotHtml = `<span style="font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; padding: 2px 6px; border-radius: 4px; position: absolute; top: -8px; right: 28px; z-index: 10;">${emoji} ${savedVisit.status}</span>`;
     }
 
     const isChecked = selectedRoutePlaces.some(p => p.id === prospect.id) ? "checked" : "";
@@ -496,22 +545,20 @@ function renderProspectsList() {
         ${statusDotHtml}
         <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 35px;">${prospect.name}</h5>
         
-        <!-- Bloco de Resumo Refinado -->
-        <div style="display:flex; gap: 8px; margin-bottom: 4px; font-size: 0.75rem; color: #64748b;">
-          <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${categoryStr}</span>
+        <div style="display:flex; gap: 8px; margin-bottom: 6px; font-size: 0.75rem; color: #475569;">
+          <span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 500;">${categoryStr}</span>
           <span style="background: #fef9c3; color: #a16207; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${ratingStr}</span>
         </div>
         
         <p class="item-detail" style="margin:0; font-size: 0.8rem; color: #64748b;"><i data-lucide="map-pin"></i> <span>${prospect.address}</span></p>
       </div>
       
-      <!-- Botão da Lixeira -->
+      <!-- Lixeira Vermelha (Blacklist Permanente) -->
       <button class="btn-discard" data-id="${prospect.id}" title="Ocultar para a equipe" style="background:none; border:none; color:#ef4444; cursor:pointer; padding:4px; position:absolute; top:8px; right:8px;">
         <i data-lucide="trash-2" style="width:16px; height:16px;"></i>
       </button>
     `;
 
-    // Ação da Lixeira (Oculta e grava na Blacklist)
     const discardBtn = card.querySelector(".btn-discard");
     discardBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -613,18 +660,22 @@ function renderVisitasList() {
 
   visitsArray.forEach(visit => {
     const card = document.createElement("div");
-    const statusClass = getStatusClass(visit.status);
     card.className = "list-item-card";
     card.style.display = "flex";
     card.style.alignItems = "flex-start";
     card.style.gap = "12px";
+    card.style.position = "relative";
     
     const isChecked = selectedRoutePlaces.some(p => p.id === visit.placeId) ? "checked" : "";
-    
-    // UI: Botão de Check-in rápido se não estiver visitado
-    const quickActionHtml = visit.status !== 'Visitado' 
-      ? `<button class="btn-quick-visit" data-id="${visit.placeId}" title="Marcar como Visitado" style="background:none; border:none; color:#10b981; cursor:pointer; padding:4px; margin-top:2px; display:flex;"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></button>` 
-      : `<span style="color:#10b981; padding:4px; margin-top:2px; display:flex;" title="Visita Concluída"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></span>`;
+    const emoji = getStatusEmoji(visit.status);
+
+    // Só exibe o Quick Action verde se NÃO estiver arquivado e nem visitado
+    let quickActionHtml = "";
+    if (visit.status !== "Arquivado") {
+      quickActionHtml = visit.status !== 'Visitado' 
+        ? `<button class="btn-quick-visit" data-id="${visit.placeId}" title="Marcar como Visitado" style="background:none; border:none; color:#10b981; cursor:pointer; padding:4px; margin-top:2px; display:flex;"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></button>` 
+        : `<span style="color:#10b981; padding:4px; margin-top:2px; display:flex;" title="Visita Concluída"><i data-lucide="check-circle" style="width:20px; height:20px;"></i></span>`;
+    }
 
     card.innerHTML = `
       <div style="padding-top: 4px; display:flex; flex-direction:column; align-items:center; gap:8px;">
@@ -632,15 +683,23 @@ function renderVisitasList() {
         ${quickActionHtml}
       </div>
       <div style="flex: 1; cursor: pointer; position: relative;" class="visit-card-content">
-        <span class="item-badge-status ${statusClass}" style="position: absolute; top: 0; right: 0;"></span>
-        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 15px;">${visit.placeName}</h5>
+        <h5 class="item-title" style="margin:0 0 4px 0; padding-right: 35px;">${visit.placeName}</h5>
+        
+        <div style="margin-bottom: 6px; font-size: 0.8rem; font-weight: 600; color: #334155;">
+          ${emoji} ${visit.status}
+        </div>
+
         <p class="item-detail" style="margin:0; font-size: 0.8rem; color: #64748b;"><i data-lucide="map-pin"></i> ${visit.placeAddress}</p>
         <p class="item-detail" style="margin:4px 0 0 0; font-size: 0.75rem;"><i data-lucide="user"></i> <b>Decisor:</b> ${visit.contactName || '---'}</p>
-        <p class="item-detail" style="margin:4px 0 0 0; font-size: 0.75rem;">Status: <b>${visit.status}</b></p>
       </div>
+
+      <!-- Ícone de Arquivar (Caixa Cinza) em vez da Lixeira Vermelha -->
+      <button class="btn-archive-visit" data-id="${visit.placeId}" title="Arquivar Cliente" style="background:none; border:none; color:#64748b; cursor:pointer; padding:4px; position:absolute; top:8px; right:8px;">
+        <i data-lucide="archive" style="width:16px; height:16px;"></i>
+      </button>
     `;
 
-    // Evento de Check-in Rápido ("Visita Concluída")
+    // Evento de Check-in Rápido
     const quickVisitBtn = card.querySelector('.btn-quick-visit');
     if (quickVisitBtn) {
       quickVisitBtn.addEventListener('click', async (e) => {
@@ -655,6 +714,22 @@ function renderVisitasList() {
         }
       });
     }
+
+    // Evento de Arquivar Visita (Atualiza o status para Arquivado e limpa da visão principal)
+    const archiveBtn = card.querySelector('.btn-archive-visit');
+    archiveBtn.addEventListener('click', async (e) => {
+      e.stopPropagation(); 
+      if(confirm(`Deseja ARQUIVAR "${visit.placeName}"? Ele sairá da sua lista ativa, mas o histórico será mantido e você poderá restaurá-lo filtrando por "Arquivados".`)) {
+        try {
+          await db.collection("visitas").doc(visit.placeId).update({
+            status: "Arquivado",
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch (error) {
+          console.error("Erro ao arquivar visita:", error);
+        }
+      }
+    });
 
     const checkbox = card.querySelector(".route-checkbox");
     checkbox.addEventListener("change", (e) => {
@@ -707,13 +782,7 @@ document.getElementById("filter-visit-status").addEventListener("change", render
 // ==========================================================================
 
 function triggerInfoWindow(marker, name, address, status, phone) {
-  let emoji = "⚪";
-  if (status === "A Visitar") emoji = "🟡";
-  if (status === "Visitado") emoji = "🟢";
-  if (status === "Potencial") emoji = "🔵";
-  if (status === "Revisitar") emoji = "🟠";
-  if (status === "Desativada/Mudou") emoji = "🔴";
-
+  const emoji = getStatusEmoji(status);
   const cleanStatus = status || "Não Cadastrado";
 
   const boxContent = `
@@ -792,28 +861,6 @@ function renderMapPins() {
       currentMarkers[visit.placeId] = marker;
     }
   });
-}
-
-function getStatusClass(status) {
-  switch (status) {
-    case "A Visitar": return "status-to-visit";
-    case "Visitado": return "status-visited";
-    case "Potencial": return "status-potential";
-    case "Revisitar": return "status-revisit";
-    case "Desativada/Mudou": return "status-inactive";
-    default: return "";
-  }
-}
-
-function getStatusHexColor(status) {
-  switch (status) {
-    case "A Visitar": return "#eab308";      
-    case "Visitado": return "#10b981";       
-    case "Potencial": return "#3b82f6";      
-    case "Revisitar": return "#f97316";      
-    case "Desativada/Mudou": return "#ef4444"; 
-    default: return "#475569";
-  }
 }
 
 // ==========================================================================
@@ -1090,6 +1137,7 @@ function generatePDFReport() {
     if (visit.status === "Potencial") statusColor = [59, 130, 246];
     if (visit.status === "Revisitar") statusColor = [249, 115, 22];
     if (visit.status === "Desativada/Mudou") statusColor = [239, 68, 68];
+    if (visit.status === "Arquivado") statusColor = [100, 116, 139];
 
     doc.setFillColor(...statusColor);
     doc.rect(15, currentY, 3, 32, 'F');
@@ -1142,7 +1190,6 @@ document.querySelectorAll(".tab-link").forEach(tabLink => {
     const targetPanelId = tabLink.getAttribute("data-tab");
     document.getElementById(targetPanelId).classList.add("active");
     
-    // Se abriu a aba Admin, força a renderização da lixeira
     if(targetPanelId === "tab-admin" && isSuperAdmin) {
       renderBlacklistTable();
     }
