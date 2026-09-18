@@ -7,7 +7,7 @@
 - Implementado shell profissional com navegação lateral, busca global, contexto de conta e identificação de ambiente demonstrativo.
 - Implementados oito módulos navegáveis: visão geral, leads, pipeline, atividades, prospecção, empresas, relatórios e administração.
 - Implementado modelo inicial de papéis, permissões, escopos e proteção da conta proprietária.
-- Implementados cinco testes de domínio para regras críticas de acesso e um teste estrutural do PDF.
+- Implementados 19 testes para acesso, governança, sessão, internacionalização e estrutura do PDF.
 - Validada a compilação de produção.
 - Validada a interface em viewport desktop de 1440 × 900 e em viewport móvel.
 - Validada a navegação entre dashboard, prospecção e administração, incluindo troca do perfil selecionado.
@@ -15,24 +15,30 @@
 - Criado relatório executivo PDF com pipeline, métricas, oportunidades, origem geográfica, metadados, rodapé e paginação.
 - Implementada internacionalização completa da interface e do PDF em português, inglês e espanhol.
 - Adicionado seletor de idioma responsivo com preferência persistente e formatação localizada de datas e valores.
+- Implementada fundação desacoplada de autenticação com estados de sessão e portas para identidade e associações.
+- Implementado painel administrativo funcional em memória com usuários, convites e trilha de auditoria.
+- Implementada revisão de mudanças com motivo obrigatório, confirmação explícita e valores antes/depois.
+- Tornada imutável a conta protegida `allcablingtechcorp@gmail.com` no domínio e na interface.
+- Implementados convite normalizado, rejeição de duplicidade, expiração em sete dias e proibição do papel proprietário.
+- Documentado o contrato completo em `docs/AUTENTICACAO_E_GOVERNANCA.md`.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 1.882 módulos transformados |
-| `npm run test` | Aprovado; 3 arquivos e 8 testes |
+| `npm run build` | Aprovado; 2.089 módulos transformados |
+| `npm run test` | Aprovado; 5 arquivos e 19 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
-| Mobile | Dashboard inspecionado com sidebar recolhida e cartões em uma coluna |
+| Mobile | Administração inspecionada com proprietário protegido, convite, revisão e auditoria |
 | PDF institucional | A4 renderizado e inspecionado; logo, métricas, tabela, rodapé e paginação aprovados |
-| Idiomas | Dashboard e relatórios verificados em PT, EN e ES; exportação em espanhol confirmada |
+| Idiomas | Dashboard, relatórios e governança verificados em PT, EN e ES; exportação em espanhol confirmada |
 
 ## Limite técnico identificado
 
 A consulta `firestore:databases:list --project d2-map-crm` retornou HTTP 403 para a sessão Firebase CLI autenticada como `dantefrota@gmail.com`. Portanto, não existem dados suficientes para verificar a edição e a região do Firestore.
 
-Até essa informação ser obtida com uma conta autorizada, regras, índices, modelo persistente, autenticação e migração de produção permanecem deliberadamente fora desta entrega.
+Até essa informação ser obtida com uma conta autorizada, regras, índices, adaptadores Firebase e migração de produção permanecem deliberadamente fora desta entrega. O contrato de sessão e governança já está implementado e testado sem persistência.
 
 ## Estado da publicação
 
@@ -40,4 +46,4 @@ A aplicação pública não foi alterada. A V2 está disponível localmente para
 
 ## Próximo marco
 
-Configurar a fundação segura do backend: autenticação, associação do usuário à organização, regras de acesso, logs de auditoria e testes no Emulator Suite. Essa etapa depende do acesso de leitura ao projeto Firebase correto e da confirmação da edição e região do banco.
+Conectar a fundação ao backend: Firebase Authentication, associação do usuário à organização, comandos administrativos, regras de acesso, persistência dos logs e testes no Emulator Suite. Essa etapa depende do acesso de leitura ao projeto Firebase correto e da confirmação da edição e região do banco.

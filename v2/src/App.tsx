@@ -2,19 +2,18 @@ import { useMemo, useState } from "react";
 import {
   Building2, CalendarDays, CheckCircle2, ChevronRight, CircleDollarSign, Clock3,
   Download, Filter, ListFilter, MapPin, MoreHorizontal, Phone, Plus, Route,
-  Search, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, UserPlus, UsersRound,
+  Search, SlidersHorizontal, Sparkles, TrendingUp, UserPlus, UsersRound,
 } from "lucide-react";
 import { AppShell, MetricCard, PageHeader } from "./components/AppShell";
 import { Brand } from "./components/Brand";
-import { demoActivities, demoLeads, demoMemberships, demoOpportunities } from "./data/demo";
-import type { Membership, ModuleId } from "./domain/access";
-import type { RoleId } from "./domain/access";
+import { demoActivities, demoLeads, demoOpportunities } from "./data/demo";
+import type { ModuleId } from "./domain/access";
 import { openStages, type ActivityKind, type LeadQualification, type OpportunityStage } from "./domain/crm";
 import { useI18n, type TranslationKey } from "./i18n/i18n";
+import { AdminGovernance } from "./components/AdminGovernance";
 
 const stageKeys: Record<OpportunityStage, TranslationKey> = { discovery: "stage.discovery", diagnosis: "stage.diagnosis", proposal: "stage.proposal", negotiation: "stage.negotiation", won: "stage.won", lost: "stage.lost" };
 const qualificationKeys: Record<LeadQualification, TranslationKey> = { new: "qualification.new", contacting: "qualification.contacting", qualified: "qualification.qualified", nurturing: "qualification.nurturing", disqualified: "qualification.disqualified" };
-const roleKeys: Record<RoleId, TranslationKey> = { owner: "role.owner", operations_admin: "role.operations_admin", sales_manager: "role.sales_manager", sales_rep: "role.sales_rep", sdr: "role.sdr", viewer: "role.viewer" };
 const activityKeys: Record<ActivityKind, TranslationKey> = { call: "activity.call", email: "activity.email", meeting: "activity.meeting", visit: "activity.visit", note: "activity.note" };
 
 function ActionButton({ children, secondary = false }: { children: React.ReactNode; secondary?: boolean }) {
@@ -134,14 +133,7 @@ function Reports() {
   return <><PageHeader eyebrow={t("reports.eyebrow")} title={t("reports.title")} description={t("reports.description")} actions={<button className="action-button secondary" onClick={exportReport} disabled={exporting}><Download size={17} /> {exporting ? t("reports.exporting") : t("reports.exportBranded")}</button>} />{exportMessage && <div className="export-feedback" role="status" aria-live="polite">{exportMessage}</div>}<div className="report-brand-banner"><Brand inverse subtitle={t("reports.brandSubtitle")} /><div><strong>{t("reports.executive")}</strong><span>{t("reports.brandDescription")}</span></div><span className="report-period">{t("reports.period")}</span></div><div className="metrics-grid"><MetricCard label={t("reports.pipelineRevenue")} value={formatMoney(5950000)} detail={t("common.demoIndicator")} /><MetricCard label={t("reports.averageTicket")} value={formatMoney(1983300)} detail={t("reports.valuedDeals")} /><MetricCard label={t("reports.activityCoverage")} value="75%" detail={t("reports.leadsWithAction")} tone="positive" /><MetricCard label={t("reports.averageCycle")} value={t("reports.days")} detail={t("common.demoIndicator")} /></div><div className="reports-grid"><Panel title={t("reports.leadSource")} description={t("reports.workspaceDistribution")}><div className="donut-layout"><div className="donut-chart"><div><strong>4</strong><span>leads</span></div></div><div className="legend"><span><i className="map-source" />{t("reports.map")} <strong>50%</strong></span><span><i className="ref-source" />{t("reports.referral")} <strong>25%</strong></span><span><i className="inbound-source" />{t("reports.inbound")} <strong>25%</strong></span></div></div></Panel><Panel title={t("reports.activityByOwner")} description={t("reports.lastThirty")}><div className="bar-chart">{[{ n: "Dante", v: 92 }, { n: "Leonardo", v: 68 }, { n: "Luciano", v: 54 }].map((item) => <div key={item.n}><span>{item.n}</span><div><i style={{ width: `${item.v}%` }} /></div><strong>{item.v}</strong></div>)}</div></Panel><Panel title={t("reports.nextIndicators")} description={t("reports.planIndicators")} className="span-two"><div className="report-catalog"><span><TrendingUp size={18} />{t("reports.conversionBySource")}</span><span><CircleDollarSign size={18} />{t("reports.revenueForecast")}</span><span><UsersRound size={18} />{t("reports.teamPerformance")}</span><span><Clock3 size={18} />{t("reports.stageDuration")}</span></div></Panel></div></>;
 }
 
-function Admin() {
-  const { t } = useI18n();
-  const [selected, setSelected] = useState<Membership>(demoMemberships[0]);
-  const scopeLabel = selected.scope === "organization" ? t("admin.allOrganization") : selected.scope === "assigned_teams" ? t("admin.assignedTeams") : t("admin.assignedRecords");
-  return <><PageHeader eyebrow={t("admin.eyebrow")} title={t("admin.title")} description={t("admin.description")} actions={<ActionButton><UserPlus size={17} /> {t("admin.invite")}</ActionButton>} /><div className="admin-alert"><ShieldCheck size={21} /><div><strong>{t("admin.protectedOwner")}</strong><span>{t("admin.protectedDescription")}</span></div></div><div className="admin-grid"><Panel title={t("admin.usersAccess")} description={t("admin.demoRecords", { count: demoMemberships.length })}><div className="member-list">{demoMemberships.map((member) => <button key={member.uid} onClick={() => setSelected(member)} className={selected.uid === member.uid ? "selected" : ""}><span className="member-avatar">{member.displayName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{member.displayName}</strong><span>{member.email}</span></div><span className={`member-status ${member.status}`}>{t(member.status === "active" ? "common.active" : "common.invited")}</span><ChevronRight size={16} /></button>)}</div></Panel><Panel title={t("admin.accessSummary")} description={t("admin.preview")}><div className="access-detail"><div className="access-identity"><span className="member-avatar large">{selected.displayName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{selected.displayName}</strong><span>{selected.email}</span></div></div><label>{t("admin.assignedRole")}<div className="readonly-field"><ShieldCheck size={17} /><span>{t(roleKeys[selected.role])}</span><ChevronRight size={16} /></div></label><label>{t("admin.dataScope")}<div className="readonly-field"><UsersRound size={17} /><span>{scopeLabel}</span></div></label><div><span className="field-label">{t("admin.allowedModules")}</span><div className="module-tags">{selected.modules.map((module) => <span key={module}>{t(`nav.${module}` as TranslationKey)}</span>)}</div></div><div className="access-actions"><ActionButton secondary>{t("common.cancel")}</ActionButton><ActionButton><ShieldCheck size={16} /> {t("admin.review")}</ActionButton></div><small className="prototype-copy">{t("admin.prototype")}</small></div></Panel></div></>;
-}
-
-const pages: Record<ModuleId, () => React.ReactNode> = { dashboard: Dashboard, leads: Leads, pipeline: Pipeline, activities: Activities, prospecting: Prospecting, companies: Companies, reports: Reports, admin: Admin };
+const pages: Record<ModuleId, () => React.ReactNode> = { dashboard: Dashboard, leads: Leads, pipeline: Pipeline, activities: Activities, prospecting: Prospecting, companies: Companies, reports: Reports, admin: AdminGovernance };
 export function App() {
   const [activeModule, setActiveModule] = useState<ModuleId>("dashboard");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);

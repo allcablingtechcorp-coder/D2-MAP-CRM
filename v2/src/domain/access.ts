@@ -53,6 +53,8 @@ export interface Membership {
   ownerProtected?: boolean;
 }
 
+export const PROTECTED_OWNER_EMAIL = "allcablingtechcorp@gmail.com";
+
 const allPermissions: Permission[] = [
   "lead.read",
   "lead.create",
@@ -156,7 +158,7 @@ export function hasPermission(membership: Membership, permission: Permission): b
 
 export function canManageMembership(actor: Membership, target: Membership): boolean {
   if (!hasPermission(actor, "membership.manage")) return false;
-  if (target.ownerProtected) return actor.uid === target.uid;
+  if (target.ownerProtected || target.email.trim().toLowerCase() === PROTECTED_OWNER_EMAIL) return false;
   return actor.role === "owner";
 }
 

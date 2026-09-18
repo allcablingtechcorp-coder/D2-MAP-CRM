@@ -34,11 +34,11 @@ describe("access policy", () => {
     expect(canManageMembership(member("operations_admin"), member("sales_rep"))).toBe(false);
   });
 
-  it("protects the owner from being changed by another membership", () => {
+  it("protects the owner from every membership change", () => {
     const owner = member("owner", { ownerProtected: true });
     const anotherOwner = member("owner", { uid: "another-owner" });
     expect(canManageMembership(anotherOwner, owner)).toBe(false);
-    expect(canManageMembership(owner, owner)).toBe(true);
+    expect(canManageMembership(owner, owner)).toBe(false);
   });
 
   it("supports explicit, reviewed permission overrides", () => {
