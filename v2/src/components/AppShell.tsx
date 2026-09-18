@@ -16,22 +16,23 @@ import {
   X,
 } from "lucide-react";
 import type { ModuleId } from "../domain/access";
+import { useI18n, type Locale, type TranslationKey } from "../i18n/i18n";
 import { Brand } from "./Brand";
 
 export interface NavigationItem {
   id: ModuleId;
-  label: string;
+  labelKey: TranslationKey;
   icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }
 
 export const navigation: NavigationItem[] = [
-  { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
-  { id: "leads", label: "Leads", icon: UsersRound },
-  { id: "pipeline", label: "Pipeline", icon: Target },
-  { id: "activities", label: "Atividades", icon: Activity },
-  { id: "prospecting", label: "Prospecção", icon: MapPinned },
-  { id: "companies", label: "Empresas", icon: Building2 },
-  { id: "reports", label: "Relatórios", icon: BarChart3 },
+  { id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { id: "leads", labelKey: "nav.leads", icon: UsersRound },
+  { id: "pipeline", labelKey: "nav.pipeline", icon: Target },
+  { id: "activities", labelKey: "nav.activities", icon: Activity },
+  { id: "prospecting", labelKey: "nav.prospecting", icon: MapPinned },
+  { id: "companies", labelKey: "nav.companies", icon: Building2 },
+  { id: "reports", labelKey: "nav.reports", icon: BarChart3 },
 ];
 
 interface AppShellProps {
@@ -49,6 +50,7 @@ export function AppShell({
   onToggleNavigation,
   children,
 }: AppShellProps) {
+  const { locale, setLocale, t } = useI18n();
   const navigate = (module: ModuleId) => {
     onNavigate(module);
     if (mobileNavigationOpen) onToggleNavigation();
@@ -56,16 +58,16 @@ export function AppShell({
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${mobileNavigationOpen ? "sidebar-open" : ""}`} aria-label="Navegação principal">
+      <aside className={`sidebar ${mobileNavigationOpen ? "sidebar-open" : ""}`} aria-label={t("shell.mainNavigation")}>
         <div className="brand-row">
-          <Brand inverse />
-          <button className="icon-button sidebar-close" onClick={onToggleNavigation} aria-label="Fechar navegação">
+          <Brand inverse subtitle={t("brand.subtitle")} />
+          <button className="icon-button sidebar-close" onClick={onToggleNavigation} aria-label={t("shell.closeNavigation")}>
             <X size={20} />
           </button>
         </div>
 
         <nav className="primary-navigation">
-          <p className="nav-label">Workspace</p>
+          <p className="nav-label">{t("nav.workspace")}</p>
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = activeModule === item.id;
@@ -77,49 +79,57 @@ export function AppShell({
                 aria-current={active ? "page" : undefined}
               >
                 <Icon size={18} strokeWidth={1.9} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </button>
             );
           })}
         </nav>
 
         <div className="sidebar-bottom">
-          <p className="nav-label">Sistema</p>
+          <p className="nav-label">{t("nav.system")}</p>
           <button className={`nav-item ${activeModule === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
             <Settings2 size={18} strokeWidth={1.9} />
-            <span>Administração</span>
+            <span>{t("nav.admin")}</span>
           </button>
           <button className="nav-item">
             <CircleHelp size={18} strokeWidth={1.9} />
-            <span>Ajuda e documentação</span>
+            <span>{t("nav.help")}</span>
           </button>
           <div className="account-card">
             <div className="avatar">AC</div>
             <div className="account-copy">
               <strong>All Cabling Tech</strong>
-              <span>Super Admin</span>
+              <span>{t("shell.superAdmin")}</span>
             </div>
             <ChevronDown size={16} aria-hidden="true" />
           </div>
         </div>
       </aside>
 
-      {mobileNavigationOpen && <button className="sidebar-scrim" onClick={onToggleNavigation} aria-label="Fechar navegação" />}
+      {mobileNavigationOpen && <button className="sidebar-scrim" onClick={onToggleNavigation} aria-label={t("shell.closeNavigation")} />}
 
       <div className="workspace">
         <header className="topbar">
-          <button className="icon-button menu-button" onClick={onToggleNavigation} aria-label="Abrir navegação">
+          <button className="icon-button menu-button" onClick={onToggleNavigation} aria-label={t("shell.openNavigation")}>
             <Menu size={21} />
           </button>
           <label className="global-search">
             <Search size={18} aria-hidden="true" />
-            <span className="sr-only">Busca global</span>
-            <input placeholder="Buscar empresas, leads e contatos..." />
+            <span className="sr-only">{t("shell.globalSearch")}</span>
+            <input placeholder={t("shell.searchPlaceholder")} />
             <kbd>⌘ K</kbd>
           </label>
           <div className="topbar-actions">
-            <span className="environment-badge">Protótipo • dados demonstrativos</span>
-            <button className="icon-button notification-button" aria-label="Notificações">
+            <div className="language-switcher" role="group" aria-label={t("language.label")}>
+              {(["pt", "en", "es"] as Locale[]).map((language) => (
+                <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language} title={t(`language.${language}` as TranslationKey)}>
+                  <span aria-hidden="true">{language === "pt" ? "🇧🇷" : language === "en" ? "🇺🇸" : "🇪🇸"}</span>
+                  <span>{language.toUpperCase()}</span>
+                </button>
+              ))}
+            </div>
+            <span className="environment-badge">{t("shell.prototype")}</span>
+            <button className="icon-button notification-button" aria-label={t("shell.notifications")}>
               <Bell size={19} />
               <span className="notification-dot" />
             </button>

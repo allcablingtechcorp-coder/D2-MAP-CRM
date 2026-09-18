@@ -18,6 +18,7 @@ A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto 
 | Sistema visual | `v2/src/styles.css` | Tokens, componentes, layouts e breakpoints responsivos |
 | Identidade | `v2/src/components/Brand.tsx` | Uso consistente do logo oficial em telas e relatórios |
 | Exportação | `v2/src/lib/exportExecutiveReport.ts` | Relatório executivo em PDF com marca, métricas e metadados |
+| Internacionalização | `v2/src/i18n/` | Catálogos PT/EN/ES, formatos locais e preferência persistente |
 
 ## Modelo de autorização proposto
 
@@ -41,6 +42,7 @@ A conta `allcablingtechcorp@gmail.com` está representada no protótipo como `ow
 - A interface de administração apresenta um resumo antes da alteração; o backend futuro deverá exigir confirmação, autorização no servidor e evento de auditoria.
 - Dados demonstrativos são identificados no topo da aplicação e não podem ser confundidos com dados reais.
 - O logo oficial presente no repositório é usado por um componente único e incorporado ao PDF; o relatório não depende de imagens externas.
+- Interface e PDF compartilham os mesmos catálogos em português, inglês e espanhol. A preferência é mantida em `localStorage` e atualiza o atributo `lang` do documento.
 - A integração real com Google Maps será conectada após autenticação, segregação por organização e políticas de uso estarem ativas.
 
 ## Próxima arquitetura técnica

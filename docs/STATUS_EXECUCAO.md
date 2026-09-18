@@ -13,17 +13,20 @@
 - Validada a navegação entre dashboard, prospecção e administração, incluindo troca do perfil selecionado.
 - Integrado o logo oficial D2 Group ao shell, ao módulo de relatórios e à exportação PDF.
 - Criado relatório executivo PDF com pipeline, métricas, oportunidades, origem geográfica, metadados, rodapé e paginação.
+- Implementada internacionalização completa da interface e do PDF em português, inglês e espanhol.
+- Adicionado seletor de idioma responsivo com preferência persistente e formatação localizada de datas e valores.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
 | `npm run build` | Aprovado; 1.882 módulos transformados |
-| `npm run test` | Aprovado; 2 arquivos e 6 testes |
+| `npm run test` | Aprovado; 3 arquivos e 8 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Dashboard inspecionado com sidebar recolhida e cartões em uma coluna |
 | PDF institucional | A4 renderizado e inspecionado; logo, métricas, tabela, rodapé e paginação aprovados |
+| Idiomas | Dashboard e relatórios verificados em PT, EN e ES; exportação em espanhol confirmada |
 
 ## Limite técnico identificado
 
