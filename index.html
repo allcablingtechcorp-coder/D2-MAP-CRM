@@ -79,14 +79,30 @@
       </div>
     </header>
 
+    <div class="workspace-toolbar">
+        <nav class="sidebar-tabs" aria-label="CRM">
+          <button class="tab-link active" data-tab="tab-prospects">
+            <i data-lucide="compass"></i>
+            <span data-i18n="tab_prospects">Resultados</span>
+          </button>
+          <button class="tab-link" data-tab="tab-visitas">
+            <i data-lucide="check-square"></i>
+            <span data-i18n="tab_visitas">Visitas</span>
+          </button>
+          <button id="tab-admin-btn" class="tab-link hidden" data-tab="tab-admin">
+            <i data-lucide="shield-check"></i>
+            <span data-i18n="tab_admin">Painel</span>
+          </button>
+        </nav>
+      <button id="btn-mobile-map" class="btn btn-outline mobile-map-toggle" aria-pressed="false"><i data-lucide="map"></i><span data-i18n="show_map">Ver mapa</span></button>
+    </div>
+
     <main class="main-content">
       
       <aside class="sidebar" style="position: relative;">
         
-        <section class="search-section card">
-          <div class="card-header">
-            <h3 data-i18n="search_title">Encontrar Clientes em Potencial</h3>
-          </div>
+        <details class="search-section card" open>
+          <summary class="card-header"><span data-i18n="search_title">Encontrar Clientes em Potencial</span><i data-lucide="chevron-down"></i></summary>
           <div class="card-body">
             <div class="form-group">
               <label for="search-input" data-i18n="search_label">O que você está procurando?</label>
@@ -114,22 +130,9 @@
               <span data-i18n="btn_search">Buscar no Google Maps</span>
             </button>
           </div>
-        </section>
+        </details>
 
-        <nav class="sidebar-tabs">
-          <button class="tab-link active" data-tab="tab-prospects">
-            <i data-lucide="compass"></i>
-            <span data-i18n="tab_prospects">Resultados</span>
-          </button>
-          <button class="tab-link" data-tab="tab-visitas">
-            <i data-lucide="check-square"></i>
-            <span data-i18n="tab_visitas">Visitas</span>
-          </button>
-          <button id="tab-admin-btn" class="tab-link hidden" data-tab="tab-admin">
-            <i data-lucide="shield-check"></i>
-            <span data-i18n="tab_admin">Painel</span>
-          </button>
-        </nav>
+
 
         <div class="tab-content-container">
           
@@ -138,7 +141,7 @@
               <h4 data-i18n="results_title">Clientes Encontrados</h4>
               <span id="results-count" class="badge">0</span>
             </div>
-            <div id="prospects-list" class="list-container" style="padding-bottom: 120px;">
+            <div id="prospects-list" class="list-container">
               <div class="empty-state">
                 <i data-lucide="map"></i>
                 <p data-i18n="empty_prospects">Digite um termo e busque para carregar os prospects.</p>
@@ -167,7 +170,7 @@
               </select>
             </div>
 
-            <div id="visitas-list" class="list-container" style="padding-bottom: 120px;">
+            <div id="visitas-list" class="list-container">
               <div class="empty-state">
                 <i data-lucide="check-square"></i>
                 <p data-i18n="empty_visitas">Nenhuma visita registrada no CRM ainda.</p>
@@ -175,44 +178,6 @@
             </div>
           </div>
 
-          <!-- ABA 3: PAINEL DE CONTROLE DO SUPER ADMIN -->
-          <div id="tab-admin" class="tab-panel">
-            
-            <div class="panel-header">
-              <h4 data-i18n="admin_panel_title">Controle de Acessos</h4>
-            </div>
-            <p class="panel-desc" data-i18n="admin_panel_desc">Gerencie os acessos e permissões dos usuários do D2 Group CRM.</p>
-            <div class="admin-users-table-container" style="margin-bottom: 30px;">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th data-i18n="th_user">Usuário</th>
-                    <th data-i18n="th_role">Acesso</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-users-list">
-                </tbody>
-              </table>
-            </div>
-
-            <div class="panel-header">
-              <h4>Lixeira de Prospecção (Falsos Positivos)</h4>
-            </div>
-            <p class="panel-desc">Locais ocultados pela equipe para não poluírem as rotas de visitas.</p>
-            <div class="admin-users-table-container">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th>Local Descartado</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-blacklist-list">
-                </tbody>
-              </table>
-            </div>
-
-          </div>
 
         </div>
 
@@ -236,15 +201,47 @@
 
       </aside>
 
-      <section class="map-wrapper">
+      <section class="map-wrapper" aria-label="Mapa de prospecção">
         <div id="map"></div>
-        <div class="map-legend">
+        <details class="map-legend" open>
+          <summary data-i18n="map_legend">Legenda do mapa</summary>
+          <div class="legend-items">
           <div class="legend-item"><span class="legend-dot status-to-visit" style="background-color: #facc15;"></span> <span data-i18n="status_to_visit_short">A Visitar</span></div>
           <div class="legend-item"><span class="legend-dot status-visited" style="background-color: #22c55e;"></span> <span data-i18n="status_visited_short">Visitado</span></div>
           <div class="legend-item"><span class="legend-dot status-potential" style="background-color: #3b82f6;"></span> <span data-i18n="status_potential_short">Potencial</span></div>
           <div class="legend-item"><span class="legend-dot status-revisit" style="background-color: #f97316;"></span> <span data-i18n="status_revisit_short">Revisitar</span></div>
           <div class="legend-item"><span class="legend-dot status-inactive" style="background-color: #ef4444;"></span> <span data-i18n="status_inactive_short">Desativada</span></div>
           <div class="legend-item"><span class="legend-dot status-archived" style="background-color: #64748b;"></span> <span data-i18n="status_archived_short">Arquivado</span></div>
+          </div>
+        </details>
+      </section>
+
+
+      <section id="tab-admin" class="tab-panel admin-workspace" aria-labelledby="admin-title">
+        <div class="admin-intro">
+          <div class="section-eyebrow" data-i18n="workspace_settings">GESTÃO DO CRM</div>
+          <h1 id="admin-title" data-i18n="admin_title">Painel de administração</h1>
+          <p data-i18n="admin_intro">Organize os acessos da equipe e os locais descartados em um só lugar.</p>
+        </div>
+        <div class="admin-grid">
+          <section class="admin-card" aria-labelledby="access-title">
+            <div class="admin-card-heading"><span class="section-icon"><i data-lucide="users"></i></span><div>
+              <h2 id="access-title" data-i18n="admin_panel_title">Controle de Acessos</h2>
+              <p data-i18n="admin_panel_desc">Gerencie os acessos e permissões dos usuários do D2 Group CRM.</p>
+            </div></div>
+            <div class="admin-users-table-container">
+              <table class="admin-table"><thead><tr><th scope="col" data-i18n="th_user">Usuário</th><th scope="col" data-i18n="th_role">Acesso</th></tr></thead><tbody id="admin-users-list"></tbody></table>
+            </div>
+          </section>
+          <section class="admin-card" aria-labelledby="trash-title">
+            <div class="admin-card-heading"><span class="section-icon muted"><i data-lucide="archive-restore"></i></span><div>
+              <h2 id="trash-title" data-i18n="trash_title">Locais descartados</h2>
+              <p data-i18n="trash_desc">Locais ocultados das buscas e rotas da equipe. Restaure um local para prospectá-lo novamente.</p>
+            </div></div>
+            <div class="admin-users-table-container">
+              <table class="admin-table"><thead><tr><th scope="col" data-i18n="discarded_place">Local descartado</th><th scope="col" data-i18n="action">Ação</th></tr></thead><tbody id="admin-blacklist-list"></tbody></table>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -255,7 +252,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <h3 data-i18n="crm_modal_title">Detalhes da Prospecção</h3>
-          <button id="btn-close-modal" class="btn btn-icon-only">
+          <button id="btn-close-modal" aria-label="Fechar" class="btn btn-icon-only">
             <i data-lucide="x"></i>
           </button>
         </div>

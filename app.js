@@ -9,6 +9,17 @@
 
 const i18n = {
   pt: {
+    workspace_settings: "GESTÃO DO CRM",
+    admin_title: "Painel de administração",
+    admin_intro: "Organize os acessos da equipe e os locais descartados em um só lugar.",
+    trash_title: "Locais descartados",
+    trash_desc: "Locais ocultados das buscas e rotas da equipe. Restaure um local para prospectá-lo novamente.",
+    discarded_place: "Local descartado",
+    action: "Ação",
+    map_legend: "Legenda do mapa",
+    show_map: "Ver mapa",
+    show_list: "Ver lista",
+
     login_subtitle: "Plataforma Avançada de Prospecção em Campo",
     btn_login_google: "Entrar com Google",
     search_title: "Encontrar Clientes em Potencial",
@@ -56,6 +67,17 @@ const i18n = {
     role_sales: "Consultor de Vendas"
   },
   en: {
+    workspace_settings: "CRM MANAGEMENT",
+    admin_title: "Administration",
+    admin_intro: "Manage team access and discarded places in one place.",
+    trash_title: "Discarded places",
+    trash_desc: "Places hidden from team searches and routes. Restore a place to prospect it again.",
+    discarded_place: "Discarded place",
+    action: "Action",
+    map_legend: "Map legend",
+    show_map: "Show map",
+    show_list: "Show list",
+
     login_subtitle: "Advanced Field Prospecting Platform",
     btn_login_google: "Sign in with Google",
     search_title: "Find Prospects",
@@ -103,6 +125,17 @@ const i18n = {
     role_sales: "Sales Rep"
   },
   es: {
+    workspace_settings: "GESTIÓN DEL CRM",
+    admin_title: "Panel de administración",
+    admin_intro: "Organice los accesos del equipo y los lugares descartados en un solo lugar.",
+    trash_title: "Lugares descartados",
+    trash_desc: "Lugares ocultos de las búsquedas y rutas del equipo. Restaure un lugar para prospectarlo nuevamente.",
+    discarded_place: "Lugar descartado",
+    action: "Acción",
+    map_legend: "Leyenda del mapa",
+    show_map: "Ver mapa",
+    show_list: "Ver lista",
+
     login_subtitle: "Plataforma Avanzada de Prospección de Campo",
     btn_login_google: "Iniciar sesión con Google",
     search_title: "Buscar Prospectos",
@@ -156,6 +189,7 @@ let currentLanguage = 'pt';
 function changeLanguage(lang) {
   if (!i18n[lang]) return;
   currentLanguage = lang;
+  document.documentElement.lang = { pt: 'pt-BR', en: 'en', es: 'es' }[lang];
   
   document.querySelectorAll('[data-i18n]').forEach(element => {
     const key = element.getAttribute('data-i18n');
@@ -375,6 +409,7 @@ if (auth) {
       await syncUserRecord(user);
       listenToBlacklist();
     } else {
+      activateWorkspace("tab-prospects");
       loggedInUser = null;
       isSuperAdmin = false;
       document.getElementById("login-container").classList.remove("hidden");
@@ -1181,19 +1216,36 @@ function generatePDFReport() {
 // 12. LOGICA DE INTERFACE
 // ==========================================================================
 
-document.querySelectorAll(".tab-link").forEach(tabLink => {
-  tabLink.addEventListener("click", () => {
-    document.querySelectorAll(".tab-link").forEach(l => l.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-
-    tabLink.classList.add("active");
-    const targetPanelId = tabLink.getAttribute("data-tab");
-    document.getElementById(targetPanelId).classList.add("active");
-    
-    if(targetPanelId === "tab-admin" && isSuperAdmin) {
-      renderBlacklistTable();
-    }
+function activateWorkspace(targetPanelId) {
+  if (targetPanelId === "tab-admin" && !isSuperAdmin) return;
+  document.querySelectorAll(".tab-link").forEach(link => {
+    const active = link.dataset.tab === targetPanelId;
+    link.classList.toggle("active", active);
+    link.setAttribute("aria-pressed", String(active));
   });
+  document.querySelectorAll(".tab-panel").forEach(panel => {
+    panel.classList.toggle("active", panel.id === targetPanelId);
+  });
+  const layout = document.getElementById("app-container");
+  layout.classList.toggle("admin-mode", targetPanelId === "tab-admin");
+  layout.classList.toggle("visits-mode", targetPanelId === "tab-visitas");
+  if (targetPanelId === "tab-admin") renderBlacklistTable();
+  if (map && window.google?.maps) requestAnimationFrame(() => google.maps.event.trigger(map, "resize"));
+}
+
+document.querySelectorAll(".tab-link").forEach(link => {
+  link.setAttribute("aria-pressed", String(link.classList.contains("active")));
+  link.addEventListener("click", () => activateWorkspace(link.dataset.tab));
+});
+
+document.getElementById("btn-mobile-map").addEventListener("click", () => {
+  const showMap = document.getElementById("app-container").classList.toggle("mobile-map-mode");
+  const button = document.getElementById("btn-mobile-map");
+  button.setAttribute("aria-pressed", String(showMap));
+  const label = button.querySelector("span");
+  label.dataset.i18n = showMap ? "show_list" : "show_map";
+  label.textContent = i18n[currentLanguage][label.dataset.i18n];
+  if (map && window.google?.maps) requestAnimationFrame(() => google.maps.event.trigger(map, "resize"));
 });
 
 document.querySelectorAll(".lang-btn").forEach(btn => {
