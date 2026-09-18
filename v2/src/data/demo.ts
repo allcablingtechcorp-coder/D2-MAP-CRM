@@ -1,5 +1,5 @@
-import type { Activity, Lead, Opportunity } from "../domain/crm";
-import type { Membership } from "../domain/access";
+import type { Activity, Lead, Opportunity } from "../domain/crm.ts";
+import type { Membership } from "../domain/access.ts";
 
 // These fixtures are loaded only by the design prototype. They are visibly marked in the UI.
 export const demoLeads: Lead[] = [

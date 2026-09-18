@@ -5,6 +5,7 @@ import {
   Search, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, UserPlus, UsersRound,
 } from "lucide-react";
 import { AppShell, MetricCard, PageHeader } from "./components/AppShell";
+import { Brand } from "./components/Brand";
 import { demoActivities, demoLeads, demoMemberships, demoOpportunities } from "./data/demo";
 import type { Membership, ModuleId } from "./domain/access";
 import { roleLabels } from "./domain/access";
@@ -106,7 +107,22 @@ function Companies() {
 }
 
 function Reports() {
-  return <><PageHeader eyebrow="Gestão" title="Relatórios" description="Analise desempenho, origem de leads e saúde do pipeline." actions={<ActionButton secondary><Download size={17} /> Exportar relatório</ActionButton>} /><div className="metrics-grid"><MetricCard label="Receita em pipeline" value="$59,500" detail="Indicador demonstrativo" /><MetricCard label="Ticket médio" value="$19,833" detail="Negócios com valor" /><MetricCard label="Cobertura de atividades" value="75%" detail="3 de 4 leads com ação" tone="positive" /><MetricCard label="Ciclo médio" value="21 dias" detail="Indicador demonstrativo" /></div><div className="reports-grid"><Panel title="Origem dos leads" description="Distribuição do workspace"><div className="donut-layout"><div className="donut-chart"><div><strong>4</strong><span>leads</span></div></div><div className="legend"><span><i className="map-source" />Mapa <strong>50%</strong></span><span><i className="ref-source" />Indicação <strong>25%</strong></span><span><i className="inbound-source" />Inbound <strong>25%</strong></span></div></div></Panel><Panel title="Atividade por responsável" description="Volume demonstrativo dos últimos 30 dias"><div className="bar-chart">{[{ n: "Dante", v: 92 }, { n: "Leonardo", v: 68 }, { n: "Luciano", v: 54 }].map((item) => <div key={item.n}><span>{item.n}</span><div><i style={{ width: `${item.v}%` }} /></div><strong>{item.v}</strong></div>)}</div></Panel><Panel title="Indicadores disponíveis na fase seguinte" description="Relatórios definidos no plano diretor" className="span-two"><div className="report-catalog"><span><TrendingUp size={18} />Conversão por origem</span><span><CircleDollarSign size={18} />Previsão de receita</span><span><UsersRound size={18} />Desempenho por equipe</span><span><Clock3 size={18} />Tempo em cada etapa</span></div></Panel></div></>;
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const exportReport = async () => {
+    setExporting(true);
+    setExportMessage("");
+    try {
+      const { exportExecutiveReport } = await import("./lib/exportExecutiveReport");
+      await exportExecutiveReport({ activities: demoActivities, generatedBy: "All Cabling Tech", leads: demoLeads, opportunities: demoOpportunities });
+      setExportMessage("PDF institucional gerado pelo navegador.");
+    } catch {
+      setExportMessage("Não foi possível gerar o PDF. Recarregue a página e tente novamente.");
+    } finally {
+      setExporting(false);
+    }
+  };
+  return <><PageHeader eyebrow="Gestão" title="Relatórios" description="Analise desempenho, origem de leads e saúde do pipeline." actions={<button className="action-button secondary" onClick={exportReport} disabled={exporting}><Download size={17} /> {exporting ? "Gerando PDF..." : "Exportar PDF com marca"}</button>} />{exportMessage && <div className="export-feedback" role="status" aria-live="polite">{exportMessage}</div>}<div className="report-brand-banner"><Brand inverse subtitle="Inteligência comercial" /><div><strong>Relatório executivo</strong><span>Identidade D2 Group aplicada à visualização e ao PDF exportado.</span></div><span className="report-period">Setembro 2026</span></div><div className="metrics-grid"><MetricCard label="Receita em pipeline" value="$59,500" detail="Indicador demonstrativo" /><MetricCard label="Ticket médio" value="$19,833" detail="Negócios com valor" /><MetricCard label="Cobertura de atividades" value="75%" detail="3 de 4 leads com ação" tone="positive" /><MetricCard label="Ciclo médio" value="21 dias" detail="Indicador demonstrativo" /></div><div className="reports-grid"><Panel title="Origem dos leads" description="Distribuição do workspace"><div className="donut-layout"><div className="donut-chart"><div><strong>4</strong><span>leads</span></div></div><div className="legend"><span><i className="map-source" />Mapa <strong>50%</strong></span><span><i className="ref-source" />Indicação <strong>25%</strong></span><span><i className="inbound-source" />Inbound <strong>25%</strong></span></div></div></Panel><Panel title="Atividade por responsável" description="Volume demonstrativo dos últimos 30 dias"><div className="bar-chart">{[{ n: "Dante", v: 92 }, { n: "Leonardo", v: 68 }, { n: "Luciano", v: 54 }].map((item) => <div key={item.n}><span>{item.n}</span><div><i style={{ width: `${item.v}%` }} /></div><strong>{item.v}</strong></div>)}</div></Panel><Panel title="Indicadores disponíveis na fase seguinte" description="Relatórios definidos no plano diretor" className="span-two"><div className="report-catalog"><span><TrendingUp size={18} />Conversão por origem</span><span><CircleDollarSign size={18} />Previsão de receita</span><span><UsersRound size={18} />Desempenho por equipe</span><span><Clock3 size={18} />Tempo em cada etapa</span></div></Panel></div></>;
 }
 
 function Admin() {

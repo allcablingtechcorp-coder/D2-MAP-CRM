@@ -7,20 +7,23 @@
 - Implementado shell profissional com navegação lateral, busca global, contexto de conta e identificação de ambiente demonstrativo.
 - Implementados oito módulos navegáveis: visão geral, leads, pipeline, atividades, prospecção, empresas, relatórios e administração.
 - Implementado modelo inicial de papéis, permissões, escopos e proteção da conta proprietária.
-- Implementados cinco testes de domínio para regras críticas de acesso.
+- Implementados cinco testes de domínio para regras críticas de acesso e um teste estrutural do PDF.
 - Validada a compilação de produção.
 - Validada a interface em viewport desktop de 1440 × 900 e em viewport móvel.
 - Validada a navegação entre dashboard, prospecção e administração, incluindo troca do perfil selecionado.
+- Integrado o logo oficial D2 Group ao shell, ao módulo de relatórios e à exportação PDF.
+- Criado relatório executivo PDF com pipeline, métricas, oportunidades, origem geográfica, metadados, rodapé e paginação.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
 | `npm run build` | Aprovado; 1.882 módulos transformados |
-| `npm run test` | Aprovado; 1 arquivo e 5 testes |
+| `npm run test` | Aprovado; 2 arquivos e 6 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Dashboard inspecionado com sidebar recolhida e cartões em uma coluna |
+| PDF institucional | A4 renderizado e inspecionado; logo, métricas, tabela, rodapé e paginação aprovados |
 
 ## Limite técnico identificado
 

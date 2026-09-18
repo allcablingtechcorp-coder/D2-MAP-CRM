@@ -16,6 +16,8 @@ A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto 
 | Autorização | `v2/src/domain/access.ts` | Papéis, permissões, escopos e proteção do proprietário |
 | Fixtures | `v2/src/data/demo.ts` | Dados exclusivamente demonstrativos |
 | Sistema visual | `v2/src/styles.css` | Tokens, componentes, layouts e breakpoints responsivos |
+| Identidade | `v2/src/components/Brand.tsx` | Uso consistente do logo oficial em telas e relatórios |
+| Exportação | `v2/src/lib/exportExecutiveReport.ts` | Relatório executivo em PDF com marca, métricas e metadados |
 
 ## Modelo de autorização proposto
 
@@ -38,6 +40,7 @@ A conta `allcablingtechcorp@gmail.com` está representada no protótipo como `ow
 - Nenhuma credencial, usuário ou dado de produção foi modificado.
 - A interface de administração apresenta um resumo antes da alteração; o backend futuro deverá exigir confirmação, autorização no servidor e evento de auditoria.
 - Dados demonstrativos são identificados no topo da aplicação e não podem ser confundidos com dados reais.
+- O logo oficial presente no repositório é usado por um componente único e incorporado ao PDF; o relatório não depende de imagens externas.
 - A integração real com Google Maps será conectada após autenticação, segregação por organização e políticas de uso estarem ativas.
 
 ## Próxima arquitetura técnica

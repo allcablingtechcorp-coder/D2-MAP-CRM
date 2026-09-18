@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import type { ModuleId } from "../domain/access";
+import { Brand } from "./Brand";
 
 export interface NavigationItem {
   id: ModuleId;
@@ -57,11 +58,7 @@ export function AppShell({
     <div className="app-shell">
       <aside className={`sidebar ${mobileNavigationOpen ? "sidebar-open" : ""}`} aria-label="Navegação principal">
         <div className="brand-row">
-          <img src="./logo.png" alt="D2 Group" />
-          <div>
-            <strong>D2 CRM</strong>
-            <span>Sales workspace</span>
-          </div>
+          <Brand inverse />
           <button className="icon-button sidebar-close" onClick={onToggleNavigation} aria-label="Fechar navegação">
             <X size={20} />
           </button>
