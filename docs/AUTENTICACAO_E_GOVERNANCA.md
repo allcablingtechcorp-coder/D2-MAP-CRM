@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Esta camada define como uma identidade autenticada passa a ter acesso ao CRM, como o proprietário administra usuários e como cada ação administrativa gera evidência de auditoria. A implementação atual é executável em memória para validação do produto e não grava dados no Firebase.
+Esta camada define como uma identidade autenticada passa a ter acesso ao CRM, como o proprietário administra usuários e como cada ação administrativa gera evidência de auditoria. O runtime Firebase está implementado, mas permanece desativado; os dados comerciais e a administração continuam em memória no modo demonstrativo.
 
 ## Resolução da sessão
 
@@ -15,7 +15,7 @@ O arquivo `v2/src/application/session.ts` separa autenticação de autorização
 | `access_blocked` | Associação convidada, suspensa ou revogada | Bloquear módulos e informar o estado do acesso |
 | `authenticated` | Identidade e associação ativa | Liberar somente módulos e dados do escopo atribuído |
 
-`AuthGateway` e `MembershipRepository` são portas tipadas. A futura integração Firebase deve implementá-las sem incluir chamadas do SDK nas páginas do produto.
+`AuthGateway` e `MembershipRepository` são portas tipadas. Os adaptadores Firebase implementam essas portas sem incluir chamadas do SDK nas páginas do produto. A aplicação continua em modo demonstrativo até a validação do backend e das regras.
 
 ## Invariantes administrativas
 
@@ -84,11 +84,10 @@ organizations/{organizationId}/auditEvents/{eventId}
 A ativação requer, nesta ordem:
 
 1. confirmar edição, região e projeto Firebase com uma conta autorizada;
-2. implementar os adaptadores de `AuthGateway` e `MembershipRepository`;
-3. implementar comandos administrativos em backend confiável;
-4. escrever regras com negação por padrão e validação de campos;
-5. testar autenticação, papéis, escopos, convites e auditoria no Emulator Suite;
-6. migrar os usuários legados e eliminar o booleano `super_admin` somente após reconciliação;
+2. implementar a função `saveMembership` e demais comandos administrativos em backend confiável;
+3. escrever regras com negação por padrão e validação de campos;
+4. testar autenticação, papéis, escopos, convites e auditoria no Emulator Suite;
+5. migrar os usuários legados e eliminar o booleano `super_admin` somente após reconciliação;
 7. validar em homologação antes de qualquer publicação.
 
 ## Testes automatizados

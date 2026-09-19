@@ -25,6 +25,20 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
 .app-shell { min-height: 100vh; }
+.session-page { min-height: 100vh; display: grid; grid-template-rows: 76px 1fr; background: radial-gradient(circle at 75% 18%, rgb(48 105 218 / 16%), transparent 32%), #0c172b; }
+.session-page > header { padding: 0 clamp(20px, 4vw, 58px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgb(255 255 255 / 9%); }
+.session-page > header .language-switcher { border-color: rgb(255 255 255 / 12%); background: rgb(255 255 255 / 6%); }
+.session-page > header .language-switcher button { color: #aebbd0; }
+.session-page > header .language-switcher button.active { background: #fff; color: #2159c4; }
+.session-card { width: min(480px, calc(100% - 36px)); margin: auto; padding: clamp(28px, 5vw, 46px); display: flex; align-items: flex-start; flex-direction: column; border: 1px solid rgb(255 255 255 / 12%); border-radius: 18px; background: #fff; box-shadow: 0 32px 90px rgb(0 0 0 / 30%); }
+.session-card > svg { margin-bottom: 22px; padding: 7px; width: 45px; height: 45px; border-radius: 11px; background: #edf3ff; color: #2b63d0; }
+.session-card h1 { margin: 0; font: 800 clamp(24px, 5vw, 31px) "Manrope", sans-serif; letter-spacing: -.035em; color: #152033; }
+.session-card > p { margin: 11px 0 22px; color: #68758a; font-size: 13px; line-height: 1.6; }
+.session-identity { width: 100%; margin: 0 0 18px; padding: 12px 14px; display: grid; gap: 3px; border: 1px solid #e0e6ed; border-radius: 9px; background: #f7f9fc; }
+.session-identity strong { color: #2d3a50; font-size: 12px; }
+.session-identity span { color: #748196; font-size: 10px; }
+.session-error { width: 100%; margin-bottom: 14px; padding: 10px 12px; border: 1px solid #f0caca; border-radius: 8px; background: #fff3f3; color: #a23c3c; font-size: 10px; line-height: 1.45; }
+.session-card .action-button { min-width: 180px; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; width: 252px; padding: 20px 14px 16px; display: flex; flex-direction: column; background: var(--navy); color: #fff; }
 .brand-row { height: 54px; padding: 0 9px 16px; display: flex; align-items: center; gap: 11px; border-bottom: 1px solid rgb(255 255 255 / 9%); }
 .brand-lockup { display: inline-flex; align-items: center; gap: 11px; }
