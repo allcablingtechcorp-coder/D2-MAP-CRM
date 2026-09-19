@@ -1,0 +1,185 @@
+import type { ComponentType, ReactNode } from "react";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  Building2,
+  ChevronDown,
+  CircleHelp,
+  LayoutDashboard,
+  MapPinned,
+  Menu,
+  Search,
+  Settings2,
+  Target,
+  UsersRound,
+  X,
+} from "lucide-react";
+import type { ModuleId } from "../domain/access";
+import { useI18n, type Locale, type TranslationKey } from "../i18n/i18n";
+import { Brand } from "./Brand";
+
+export interface NavigationItem {
+  id: ModuleId;
+  labelKey: TranslationKey;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
+}
+
+export const navigation: NavigationItem[] = [
+  { id: "dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { id: "leads", labelKey: "nav.leads", icon: UsersRound },
+  { id: "pipeline", labelKey: "nav.pipeline", icon: Target },
+  { id: "activities", labelKey: "nav.activities", icon: Activity },
+  { id: "prospecting", labelKey: "nav.prospecting", icon: MapPinned },
+  { id: "companies", labelKey: "nav.companies", icon: Building2 },
+  { id: "reports", labelKey: "nav.reports", icon: BarChart3 },
+];
+
+interface AppShellProps {
+  activeModule: ModuleId;
+  onNavigate: (module: ModuleId) => void;
+  mobileNavigationOpen: boolean;
+  onToggleNavigation: () => void;
+  children: ReactNode;
+}
+
+export function AppShell({
+  activeModule,
+  onNavigate,
+  mobileNavigationOpen,
+  onToggleNavigation,
+  children,
+}: AppShellProps) {
+  const { locale, setLocale, t } = useI18n();
+  const navigate = (module: ModuleId) => {
+    onNavigate(module);
+    if (mobileNavigationOpen) onToggleNavigation();
+  };
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${mobileNavigationOpen ? "sidebar-open" : ""}`} aria-label={t("shell.mainNavigation")}>
+        <div className="brand-row">
+          <Brand inverse subtitle={t("brand.subtitle")} />
+          <button className="icon-button sidebar-close" onClick={onToggleNavigation} aria-label={t("shell.closeNavigation")}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="primary-navigation">
+          <p className="nav-label">{t("nav.workspace")}</p>
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const active = activeModule === item.id;
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${active ? "active" : ""}`}
+                onClick={() => navigate(item.id)}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon size={18} strokeWidth={1.9} />
+                <span>{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <p className="nav-label">{t("nav.system")}</p>
+          <button className={`nav-item ${activeModule === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
+            <Settings2 size={18} strokeWidth={1.9} />
+            <span>{t("nav.admin")}</span>
+          </button>
+          <button className="nav-item">
+            <CircleHelp size={18} strokeWidth={1.9} />
+            <span>{t("nav.help")}</span>
+          </button>
+          <div className="account-card">
+            <div className="avatar">AC</div>
+            <div className="account-copy">
+              <strong>All Cabling Tech</strong>
+              <span>{t("shell.superAdmin")}</span>
+            </div>
+            <ChevronDown size={16} aria-hidden="true" />
+          </div>
+        </div>
+      </aside>
+
+      {mobileNavigationOpen && <button className="sidebar-scrim" onClick={onToggleNavigation} aria-label={t("shell.closeNavigation")} />}
+
+      <div className="workspace">
+        <header className="topbar">
+          <button className="icon-button menu-button" onClick={onToggleNavigation} aria-label={t("shell.openNavigation")}>
+            <Menu size={21} />
+          </button>
+          <label className="global-search">
+            <Search size={18} aria-hidden="true" />
+            <span className="sr-only">{t("shell.globalSearch")}</span>
+            <input placeholder={t("shell.searchPlaceholder")} />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div className="topbar-actions">
+            <div className="language-switcher" role="group" aria-label={t("language.label")}>
+              {(["pt", "en", "es"] as Locale[]).map((language) => (
+                <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language} title={t(`language.${language}` as TranslationKey)}>
+                  <span aria-hidden="true">{language === "pt" ? "🇧🇷" : language === "en" ? "🇺🇸" : "🇪🇸"}</span>
+                  <span>{language.toUpperCase()}</span>
+                </button>
+              ))}
+            </div>
+            <span className="environment-badge">{t("shell.prototype")}</span>
+            <button className="icon-button notification-button" aria-label={t("shell.notifications")}>
+              <Bell size={19} />
+              <span className="notification-dot" />
+            </button>
+          </div>
+        </header>
+        <main className="page-content">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="page-header">
+      <div>
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </div>
+      {actions && <div className="page-actions">{actions}</div>}
+    </div>
+  );
+}
+
+export function MetricCard({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "neutral" | "positive" | "warning";
+}) {
+  return (
+    <article className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small className={`metric-detail ${tone}`}>{detail}</small>
+    </article>
+  );
+}
