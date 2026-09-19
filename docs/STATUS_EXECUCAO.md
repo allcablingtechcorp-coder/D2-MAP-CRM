@@ -29,13 +29,18 @@
 - Tornados dinâmicos dashboard, empresas e relatórios com base no mesmo estado comercial.
 - Corrigidas as métricas de atividades do dia, próximos sete dias, pipeline aberto, ticket médio aberto e cobertura da carteira.
 - Documentado o fluxo em `docs/FLUXO_COMERCIAL_V2.md`.
+- Implementada ficha detalhada da conta com pipeline, responsável, origem, próxima ação e histórico de atividades.
+- Implementadas ações contextuais para criar atividade e oportunidade com empresa e responsável preenchidos.
+- Implementados filtros combináveis por qualificação, responsável, prioridade e origem.
+- Preparado workflow de testes, build e publicação da V2 no GitHub Pages.
+- Documentados ativação, homologação e reversão em `docs/PUBLICACAO_GITHUB_PAGES.md`.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 2.093 módulos transformados |
-| `npm run test` | Aprovado; 7 arquivos e 30 testes |
+| `npm run build` | Aprovado; 2.095 módulos transformados |
+| `npm run test` | Aprovado; 8 arquivos e 33 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Administração inspecionada com proprietário protegido, convite, revisão e auditoria |
@@ -43,6 +48,8 @@
 | Idiomas | Dashboard, relatórios e governança verificados em PT, EN e ES; exportação em espanhol confirmada |
 | Fluxo comercial | Conversão mapa → lead, criação e conclusão de atividade, criação e avanço de oportunidade validados no navegador |
 | Persistência demonstrativa | Registros criados permaneceram disponíveis entre módulos e recargas locais |
+| Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
+| GitHub Pages | URL atual responde HTTP 200; origem legacy `main`/raiz confirmada; workflow V2 preparado |
 
 ## Limite técnico identificado
 
@@ -56,4 +63,4 @@ A aplicação pública não foi alterada. A V2 está disponível localmente para
 
 ## Próximo marco
 
-Criar as páginas de detalhe de lead e empresa, filtros operacionais e histórico de interações. Em paralelo, a conexão com Firebase Authentication, regras de acesso, logs e Emulator Suite continua dependente do acesso de leitura ao projeto Firebase correto e da confirmação da edição e região do banco.
+Para homologação online, mesclar o PR e trocar a fonte do GitHub Pages para GitHub Actions. Para produção real, a conexão com Firebase Authentication, regras de acesso, logs e Emulator Suite continua dependente do acesso administrativo ao projeto Firebase correto e da confirmação da edição e região do banco.

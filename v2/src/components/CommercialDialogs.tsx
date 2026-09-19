@@ -36,13 +36,13 @@ export function LeadDialog({ preset, onClose, onCreated }: { preset?: Partial<Le
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal commercial-modal" role="dialog" aria-modal="true" aria-labelledby="lead-dialog-title"><header><div><span>{t("leadDialog.eyebrow")}</span><h2 id="lead-dialog-title">{t(preset?.source === "map" ? "leadDialog.mapTitle" : "leadDialog.title")}</h2><p>{t("leadDialog.description")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19} /></button></header><form onSubmit={submit}><div className="dialog-grid"><label>{t("leads.company")}<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} autoFocus /></label><label>{t("leadDialog.location")}<input value={location} onChange={(event) => setLocation(event.target.value)} /></label><label>{t("leads.owner")}<select value={ownerName} onChange={(event) => setOwnerName(event.target.value)}><option>Dante Frota</option><option>Leonardo Agiani</option><option>Luciano Souza</option></select></label><label>{t("leads.priority")}<select value={priority} onChange={(event) => setPriority(event.target.value as Lead["priority"])}><option value="high">{t("priority.high")}</option><option value="medium">{t("priority.medium")}</option><option value="low">{t("priority.low")}</option></select></label><label className="span-two">{t("leads.nextAction")}<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} placeholder={t("leadDialog.nextActionPlaceholder")} /></label><label className="span-two">{t("leadDialog.dueAt")}<input type="datetime-local" value={nextActionAt} onChange={(event) => setNextActionAt(event.target.value)} /></label></div>{errorKey && <div className="governance-feedback error" role="alert">{t(errorKey)}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button"><UserPlus size={16} />{t("leadDialog.create")}</button></footer></form></section></div>;
 }
 
-export function ActivityDialog({ onClose }: { onClose: () => void }) {
+export function ActivityDialog({ onClose, preset }: { onClose: () => void; preset?: { companyName?: string; ownerName?: string } }) {
   const { t } = useI18n();
   const workspace = useCrmWorkspace();
   const [kind, setKind] = useState<ActivityKind>("call");
   const [subject, setSubject] = useState("");
-  const [companyName, setCompanyName] = useState(workspace.leads[0]?.companyName ?? "");
-  const [ownerName, setOwnerName] = useState("Dante Frota");
+  const [companyName, setCompanyName] = useState(preset?.companyName ?? workspace.leads[0]?.companyName ?? "");
+  const [ownerName, setOwnerName] = useState(preset?.ownerName ?? "Dante Frota");
   const [dueAt, setDueAt] = useState(localDateTime(4));
   const [error, setError] = useState(false);
   const activityKeys: Record<ActivityKind, TranslationKey> = { call: "activity.call", email: "activity.email", meeting: "activity.meeting", visit: "activity.visit", note: "activity.note" };
@@ -57,12 +57,12 @@ export function ActivityDialog({ onClose }: { onClose: () => void }) {
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal commercial-modal" role="dialog" aria-modal="true" aria-labelledby="activity-dialog-title"><header><div><span>{t("activityDialog.eyebrow")}</span><h2 id="activity-dialog-title">{t("activityDialog.title")}</h2><p>{t("activityDialog.description")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19} /></button></header><form onSubmit={submit}><div className="dialog-grid"><label>{t("activityDialog.type")}<select value={kind} onChange={(event) => setKind(event.target.value as ActivityKind)}>{Object.entries(activityKeys).map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label><label>{t("leads.owner")}<select value={ownerName} onChange={(event) => setOwnerName(event.target.value)}><option>Dante Frota</option><option>Leonardo Agiani</option><option>Luciano Souza</option></select></label><label className="span-two">{t("activityDialog.subject")}<input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder={t("activityDialog.subjectPlaceholder")} autoFocus /></label><label>{t("leads.company")}<select value={companyName} onChange={(event) => setCompanyName(event.target.value)}>{workspace.leads.map((lead) => <option key={lead.id}>{lead.companyName}</option>)}</select></label><label>{t("leadDialog.dueAt")}<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></div>{error && <div className="governance-feedback error" role="alert">{t("leadDialog.required")}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button"><CalendarPlus size={16} />{t("activityDialog.create")}</button></footer></form></section></div>;
 }
 
-export function OpportunityDialog({ onClose }: { onClose: () => void }) {
+export function OpportunityDialog({ onClose, preset }: { onClose: () => void; preset?: { companyName?: string; ownerName?: string } }) {
   const { t } = useI18n();
   const workspace = useCrmWorkspace();
   const [title, setTitle] = useState("");
-  const [companyName, setCompanyName] = useState(workspace.leads[0]?.companyName ?? "");
-  const [ownerName, setOwnerName] = useState("Dante Frota");
+  const [companyName, setCompanyName] = useState(preset?.companyName ?? workspace.leads[0]?.companyName ?? "");
+  const [ownerName, setOwnerName] = useState(preset?.ownerName ?? "Dante Frota");
   const [amount, setAmount] = useState("");
   const [nextAction, setNextAction] = useState("");
   const [expectedCloseAt, setExpectedCloseAt] = useState(localDateTime(24 * 21).slice(0, 10));

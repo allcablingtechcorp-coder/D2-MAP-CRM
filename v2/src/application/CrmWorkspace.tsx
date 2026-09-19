@@ -59,7 +59,12 @@ export function CrmWorkspaceProvider({ children }: { children: ReactNode }) {
     completeActivity: (id) => setSnapshot((state) => ({ ...state, activities: state.activities.map((item) => item.id === id ? completeActivity(item) : item) })),
     addActivity: (input) => {
       const activity: Activity = { ...input, id: crypto.randomUUID(), completed: false };
-      setSnapshot((state) => ({ ...state, activities: [activity, ...state.activities] }));
+      const occurredAt = new Date().toISOString();
+      setSnapshot((state) => ({
+        ...state,
+        activities: [activity, ...state.activities],
+        leads: state.leads.map((lead) => lead.companyName === activity.companyName ? { ...lead, lastActivityAt: occurredAt } : lead),
+      }));
       return activity;
     },
     addOpportunity: (input) => {

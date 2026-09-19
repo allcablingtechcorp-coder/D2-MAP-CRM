@@ -20,11 +20,13 @@ A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto 
 | Regras de fluxo | `v2/src/domain/workflows.ts` | Criação de leads, duplicidade, transições de oportunidade e conclusão de atividades |
 | Métricas comerciais | `v2/src/domain/metrics.ts` | Indicadores de agenda, pipeline aberto e cobertura de atividades |
 | Administração | `v2/src/components/AdminGovernance.tsx` | Usuários, convites e auditoria com revisão explícita |
+| Ficha comercial | `v2/src/components/CommercialDetails.tsx` | Visão consolidada da conta, pipeline, próximas ações e histórico |
 | Fixtures | `v2/src/data/demo.ts` | Dados exclusivamente demonstrativos |
 | Sistema visual | `v2/src/styles.css` | Tokens, componentes, layouts e breakpoints responsivos |
 | Identidade | `v2/src/components/Brand.tsx` | Uso consistente do logo oficial em telas e relatórios |
 | Exportação | `v2/src/lib/exportExecutiveReport.ts` | Relatório executivo em PDF com marca, métricas e metadados |
 | Internacionalização | `v2/src/i18n/` | Catálogos PT/EN/ES, formatos locais e preferência persistente |
+| Publicação | `.github/workflows/deploy-v2-pages.yml` | Teste, build e entrega do artefato V2 ao GitHub Pages |
 
 ## Modelo de autorização proposto
 

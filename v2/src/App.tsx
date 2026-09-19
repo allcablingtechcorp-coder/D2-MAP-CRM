@@ -7,13 +7,15 @@ import {
 import { AppShell, MetricCard, PageHeader } from "./components/AppShell";
 import { Brand } from "./components/Brand";
 import type { ModuleId } from "./domain/access";
-import { openStages, type ActivityKind, type LeadQualification, type OpportunityStage } from "./domain/crm";
+import { openStages, type ActivityKind, type Lead, type LeadQualification, type OpportunityStage } from "./domain/crm";
 import { useI18n, type TranslationKey } from "./i18n/i18n";
 import { AdminGovernance } from "./components/AdminGovernance";
 import { ActivityDialog, LeadDialog, OpportunityDialog } from "./components/CommercialDialogs";
 import { useCrmWorkspace } from "./application/CrmWorkspace";
 import { nextOpenStage } from "./domain/workflows";
 import { leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSevenDays } from "./domain/metrics";
+import { CommercialDetails } from "./components/CommercialDetails";
+import { activeLeadFilterCount, emptyLeadFilters, filterLeads, type LeadFilters } from "./domain/leadFilters";
 
 const stageKeys: Record<OpportunityStage, TranslationKey> = { discovery: "stage.discovery", diagnosis: "stage.diagnosis", proposal: "stage.proposal", negotiation: "stage.negotiation", won: "stage.won", lost: "stage.lost" };
 const qualificationKeys: Record<LeadQualification, TranslationKey> = { new: "qualification.new", contacting: "qualification.contacting", qualified: "qualification.qualified", nurturing: "qualification.nurturing", disqualified: "qualification.disqualified" };
@@ -64,20 +66,26 @@ function Dashboard() {
 function Leads() {
   const { t, formatDateTime } = useI18n();
   const { leads } = useCrmWorkspace();
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<LeadFilters>(emptyLeadFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const filtered = leads.filter((lead) => `${lead.companyName} ${lead.location} ${lead.ownerName}`.toLowerCase().includes(query.toLowerCase()));
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const filtered = filterLeads(leads, filters);
+  const activeFilters = activeLeadFilterCount(filters);
+  const owners = [...new Set(leads.map((lead) => lead.ownerName))];
   return <>
     <PageHeader eyebrow={t("leads.eyebrow")} title={t("leads.title")} description={t("leads.description")} actions={<ActionButton onClick={() => setDialogOpen(true)}><UserPlus size={17} /> {t("leads.add")}</ActionButton>} />
-    <div className="toolbar"><label className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("leads.search")} /></label><ActionButton secondary><ListFilter size={16} /> {t("common.filters")}</ActionButton><ActionButton secondary><Download size={16} /> {t("common.export")}</ActionButton></div>
+    <div className="toolbar"><label className="table-search"><Search size={17} /><input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} placeholder={t("leads.search")} /></label><ActionButton secondary onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}><ListFilter size={16} /> {t("common.filters")}{activeFilters > 0 && <span className="filter-count">{activeFilters}</span>}</ActionButton><ActionButton secondary><Download size={16} /> {t("common.export")}</ActionButton></div>
+    {filtersOpen && <section className="lead-filter-panel" aria-label={t("common.filters")}><label>{t("filters.qualification")}<select value={filters.qualification} onChange={(event) => setFilters((current) => ({ ...current, qualification: event.target.value as LeadFilters["qualification"] }))}><option value="all">{t("common.all")}</option>{Object.keys(qualificationKeys).map((value) => <option key={value} value={value}>{t(qualificationKeys[value as LeadQualification])}</option>)}</select></label><label>{t("filters.owner")}<select value={filters.ownerName} onChange={(event) => setFilters((current) => ({ ...current, ownerName: event.target.value }))}><option value="all">{t("common.all")}</option>{owners.map((owner) => <option key={owner}>{owner}</option>)}</select></label><label>{t("filters.priority")}<select value={filters.priority} onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value as LeadFilters["priority"] }))}><option value="all">{t("common.all")}</option><option value="high">{t("priority.high")}</option><option value="medium">{t("priority.medium")}</option><option value="low">{t("priority.low")}</option></select></label><label>{t("filters.source")}<select value={filters.source} onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value as LeadFilters["source"] }))}><option value="all">{t("common.all")}</option><option value="map">{t("source.map")}</option><option value="referral">{t("source.referral")}</option><option value="inbound">{t("source.inbound")}</option><option value="manual">{t("source.manual")}</option></select></label><button className="text-button" onClick={() => setFilters({ ...emptyLeadFilters, query: filters.query })}>{t("common.clear")}</button></section>}
     <Panel title={t("leads.workspaceCount", { count: filtered.length })} description={t("leads.demoDescription")}>
       <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t("leads.company")}</th><th>{t("leads.status")}</th><th>{t("leads.priority")}</th><th>{t("leads.owner")}</th><th>{t("leads.nextAction")}</th><th>{t("leads.lastActivity")}</th><th /></tr></thead><tbody>{filtered.map((lead) => <tr key={lead.id}>
-        <td><div className="table-primary"><span className="company-mark small">{lead.companyName.slice(0, 2).toUpperCase()}</span><div><strong>{lead.companyName}</strong><span><MapPin size={12} /> {lead.location}</span></div></div></td>
+        <td><button className="table-primary account-link" onClick={() => setSelectedLead(lead)}><span className="company-mark small">{lead.companyName.slice(0, 2).toUpperCase()}</span><span><strong>{lead.companyName}</strong><small><MapPin size={12} /> {lead.location}</small></span></button></td>
         <td><span className={`status-pill ${lead.qualification}`}>{t(qualificationKeys[lead.qualification])}</span></td><td><span className={`priority ${lead.priority}`}><i /> {t(`priority.${lead.priority}` as TranslationKey)}</span></td>
-        <td>{lead.ownerName}</td><td><strong className="cell-action">{lead.nextAction}</strong><span>{formatDateTime(lead.nextActionAt)}</span></td><td>{formatDateTime(lead.lastActivityAt)}</td><td><button className="icon-button"><MoreHorizontal size={18} /></button></td>
+        <td>{lead.ownerName}</td><td><strong className="cell-action">{lead.nextAction}</strong><span>{formatDateTime(lead.nextActionAt)}</span></td><td>{formatDateTime(lead.lastActivityAt)}</td><td><button className="icon-button" onClick={() => setSelectedLead(lead)} aria-label={t("leads.viewDetails")}><MoreHorizontal size={18} /></button></td>
       </tr>)}</tbody></table></div>
     </Panel>
     {dialogOpen && <LeadDialog onClose={() => setDialogOpen(false)} />}
+    {selectedLead && <CommercialDetails lead={leads.find((lead) => lead.id === selectedLead.id) ?? selectedLead} onClose={() => setSelectedLead(null)} />}
   </>;
 }
 
@@ -146,8 +154,10 @@ function Prospecting() {
 function Companies() {
   const { t } = useI18n();
   const { leads, opportunities } = useCrmWorkspace();
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const companies = leads.map((lead, index) => ({ ...lead, contacts: index + 1, opportunities: opportunities.filter((item) => item.companyName === lead.companyName).length }));
-  return <><PageHeader eyebrow={t("companies.eyebrow")} title={t("companies.title")} description={t("companies.description")} actions={<ActionButton><Building2 size={17} /> {t("companies.new")}</ActionButton>} /><Panel title={t("companies.count", { count: companies.length })} description={t("companies.demoDescription")}><div className="company-grid">{companies.map((company) => <article className="company-card" key={company.id}><div className="company-card-top"><span className="company-mark">{company.companyName.slice(0, 2).toUpperCase()}</span><button className="icon-button"><MoreHorizontal size={18} /></button></div><h3>{company.companyName}</h3><span><MapPin size={13} /> {company.location}</span><div className="company-stats"><div><strong>{company.contacts}</strong><span>{t("companies.contacts")}</span></div><div><strong>{company.opportunities}</strong><span>{t("companies.deals")}</span></div></div><footer><span className="mini-avatar">{company.ownerName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>{company.ownerName}<ChevronRight size={16} /></footer></article>)}</div></Panel></>;
+  return <><PageHeader eyebrow={t("companies.eyebrow")} title={t("companies.title")} description={t("companies.description")} actions={<ActionButton onClick={() => setDialogOpen(true)}><Building2 size={17} /> {t("companies.new")}</ActionButton>} /><Panel title={t("companies.count", { count: companies.length })} description={t("companies.demoDescription")}><div className="company-grid">{companies.map((company) => <article className="company-card" key={company.id}><div className="company-card-top"><span className="company-mark">{company.companyName.slice(0, 2).toUpperCase()}</span><button className="icon-button" onClick={() => setSelectedLead(company)} aria-label={t("leads.viewDetails")}><MoreHorizontal size={18} /></button></div><h3>{company.companyName}</h3><span><MapPin size={13} /> {company.location}</span><div className="company-stats"><div><strong>{company.contacts}</strong><span>{t("companies.contacts")}</span></div><div><strong>{company.opportunities}</strong><span>{t("companies.deals")}</span></div></div><button className="company-open" onClick={() => setSelectedLead(company)}><span className="mini-avatar">{company.ownerName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>{company.ownerName}<ChevronRight size={16} /></button></article>)}</div></Panel>{dialogOpen && <LeadDialog onClose={() => setDialogOpen(false)} />}{selectedLead && <CommercialDetails lead={leads.find((lead) => lead.id === selectedLead.id) ?? selectedLead} onClose={() => setSelectedLead(null)} />}</>;
 }
 
 function Reports() {
