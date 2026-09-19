@@ -16,6 +16,7 @@ import { nextOpenStage } from "./domain/workflows";
 import { leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSevenDays } from "./domain/metrics";
 import { CommercialDetails } from "./components/CommercialDetails";
 import { activeLeadFilterCount, emptyLeadFilters, filterLeads, type LeadFilters } from "./domain/leadFilters";
+import { useRuntimeSession } from "./application/SessionRuntime";
 
 const stageKeys: Record<OpportunityStage, TranslationKey> = { discovery: "stage.discovery", diagnosis: "stage.diagnosis", proposal: "stage.proposal", negotiation: "stage.negotiation", won: "stage.won", lost: "stage.lost" };
 const qualificationKeys: Record<LeadQualification, TranslationKey> = { new: "qualification.new", contacting: "qualification.contacting", qualified: "qualification.qualified", nurturing: "qualification.nurturing", disqualified: "qualification.disqualified" };
@@ -188,6 +189,20 @@ const pages: Record<ModuleId, () => React.ReactNode> = { dashboard: Dashboard, l
 export function App() {
   const [activeModule, setActiveModule] = useState<ModuleId>("dashboard");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const Page = useMemo(() => pages[activeModule], [activeModule]);
-  return <AppShell activeModule={activeModule} onNavigate={setActiveModule} mobileNavigationOpen={mobileNavigationOpen} onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}><Page /></AppShell>;
+  const { mode, identity, membership } = useRuntimeSession();
+  const { t } = useI18n();
+  const availableModules = membership?.modules;
+  const resolvedModule = !availableModules || availableModules.includes(activeModule)
+    ? activeModule
+    : availableModules[0];
+  const Page = useMemo(() => resolvedModule ? pages[resolvedModule] : null, [resolvedModule]);
+  return <AppShell
+    activeModule={resolvedModule ?? activeModule}
+    onNavigate={setActiveModule}
+    mobileNavigationOpen={mobileNavigationOpen}
+    onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}
+    availableModules={availableModules}
+    account={mode === "firebase" ? { displayName: identity.displayName, detail: t(`role.${membership.role}` as TranslationKey) } : undefined}
+    environmentLabel={mode === "firebase" ? t("shell.secureWorkspace") : undefined}
+  >{Page ? <Page /> : <div className="empty-governance"><strong>{t("auth.noModulesTitle")}</strong><span>{t("auth.noModulesDescription")}</span></div>}</AppShell>;
 }

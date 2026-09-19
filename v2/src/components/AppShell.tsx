@@ -40,6 +40,9 @@ interface AppShellProps {
   onNavigate: (module: ModuleId) => void;
   mobileNavigationOpen: boolean;
   onToggleNavigation: () => void;
+  availableModules?: readonly ModuleId[];
+  account?: { displayName: string; detail: string };
+  environmentLabel?: string;
   children: ReactNode;
 }
 
@@ -48,6 +51,9 @@ export function AppShell({
   onNavigate,
   mobileNavigationOpen,
   onToggleNavigation,
+  availableModules,
+  account,
+  environmentLabel,
   children,
 }: AppShellProps) {
   const { locale, setLocale, t } = useI18n();
@@ -68,7 +74,7 @@ export function AppShell({
 
         <nav className="primary-navigation">
           <p className="nav-label">{t("nav.workspace")}</p>
-          {navigation.map((item) => {
+          {navigation.filter((item) => !availableModules || availableModules.includes(item.id)).map((item) => {
             const Icon = item.icon;
             const active = activeModule === item.id;
             return (
@@ -87,19 +93,19 @@ export function AppShell({
 
         <div className="sidebar-bottom">
           <p className="nav-label">{t("nav.system")}</p>
-          <button className={`nav-item ${activeModule === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
+          {(!availableModules || availableModules.includes("admin")) && <button className={`nav-item ${activeModule === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
             <Settings2 size={18} strokeWidth={1.9} />
             <span>{t("nav.admin")}</span>
-          </button>
+          </button>}
           <button className="nav-item">
             <CircleHelp size={18} strokeWidth={1.9} />
             <span>{t("nav.help")}</span>
           </button>
           <div className="account-card">
-            <div className="avatar">AC</div>
+            <div className="avatar">{initials(account?.displayName ?? "All Cabling Tech")}</div>
             <div className="account-copy">
-              <strong>All Cabling Tech</strong>
-              <span>{t("shell.superAdmin")}</span>
+              <strong>{account?.displayName ?? "All Cabling Tech"}</strong>
+              <span>{account?.detail ?? t("shell.superAdmin")}</span>
             </div>
             <ChevronDown size={16} aria-hidden="true" />
           </div>
@@ -128,7 +134,7 @@ export function AppShell({
                 </button>
               ))}
             </div>
-            <span className="environment-badge">{t("shell.prototype")}</span>
+            <span className="environment-badge">{environmentLabel ?? t("shell.prototype")}</span>
             <button className="icon-button notification-button" aria-label={t("shell.notifications")}>
               <Bell size={19} />
               <span className="notification-dot" />
@@ -139,6 +145,10 @@ export function AppShell({
       </div>
     </div>
   );
+}
+
+function initials(value: string): string {
+  return value.split(/\s+/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 }
 
 export function PageHeader({

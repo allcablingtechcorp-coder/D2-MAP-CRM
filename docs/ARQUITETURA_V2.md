@@ -4,7 +4,7 @@
 
 Esta fundação converte a navegação centrada no mapa em um workspace comercial com módulos próprios para dashboard, leads, pipeline, atividades, prospecção geográfica, empresas, relatórios e administração.
 
-A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto autenticação, banco, regras e migração não forem validados.
+A V2 está isolada em `v2/` e publicada no modo demonstrativo. A ativação do runtime Firebase permanece condicionada à validação de autenticação, banco, regras e migração.
 
 ## Camadas atuais
 
@@ -16,6 +16,7 @@ A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto 
 | Autorização | `v2/src/domain/access.ts` | Papéis, permissões, escopos e proteção do proprietário |
 | Governança | `v2/src/domain/governance.ts` | Convites, revisão de mudanças, invariantes e contrato de auditoria |
 | Sessão | `v2/src/application/session.ts` | Estados de autenticação e portas para identidade e associações |
+| Adaptadores Firebase | `v2/src/infrastructure/firebase/` | Configuração externa, login Google, leitura tipada de associações e comando administrativo via Cloud Function |
 | Workspace comercial | `v2/src/application/CrmWorkspace.tsx` | Estado compartilhado, comandos da interface e persistência local demonstrativa |
 | Regras de fluxo | `v2/src/domain/workflows.ts` | Criação de leads, duplicidade, transições de oportunidade e conclusão de atividades |
 | Métricas comerciais | `v2/src/domain/metrics.ts` | Indicadores de agenda, pipeline aberto e cobertura de atividades |
@@ -56,13 +57,12 @@ A conta `allcablingtechcorp@gmail.com` está representada como `ownerProtected` 
 
 ## Próxima arquitetura técnica
 
-1. Confirmar projeto, edição e região do Firestore com uma conta autorizada.
-2. Implementar os adaptadores Firebase das portas `AuthGateway` e `MembershipRepository` já definidas.
+1. Recuperar acesso ao projeto `d2-map-crm` e confirmar edição e região do Firestore.
+2. Implementar a Cloud Function `saveMembership` com autorização e auditoria transacionais.
 3. Criar regras do Firestore com negação por padrão, validação de campos e escopo por equipe ou responsável.
-4. Persistir no backend o contrato de auditoria já definido para login, consulta, criação, atualização, exportação e mudanças administrativas.
-5. Substituir fixtures por repositórios tipados sem alterar as páginas.
-6. Migrar pesquisa, locais salvos e supressões da aplicação atual.
-7. Executar testes de regras com Emulator Suite antes do primeiro deploy V2.
+4. Substituir fixtures por repositórios comerciais tipados sem alterar as páginas.
+5. Migrar pesquisa, locais salvos e supressões da aplicação atual.
+6. Executar testes de regras com Emulator Suite antes do primeiro deploy com backend real.
 
 ## Critério de ativação
 

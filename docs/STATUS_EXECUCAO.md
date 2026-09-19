@@ -34,33 +34,41 @@
 - Implementados filtros combináveis por qualificação, responsável, prioridade e origem.
 - Preparado workflow de testes, build e publicação da V2 no GitHub Pages.
 - Documentados ativação, homologação e reversão em `docs/PUBLICACAO_GITHUB_PAGES.md`.
+- Publicada a V2 no GitHub Pages por GitHub Actions e validada em desktop e mobile nos três idiomas.
+- Implementada a fundação Firebase com configuração externa, login Google, leitura tipada de associações e alterações administrativas por Cloud Function.
+- Conectada a resolução condicional de sessão à interface com telas de login, associação ausente, acesso bloqueado e configuração inválida.
+- Aplicado o filtro de módulos da associação à navegação e o contexto real de identidade e papel ao shell.
+- Fixado o SDK modular Firebase `12.19.0` e mantido o build público no modo demonstrativo.
+- Documentado o contrato e os critérios de ativação em `docs/INTEGRACAO_FIREBASE.md`.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 2.095 módulos transformados |
-| `npm run test` | Aprovado; 8 arquivos e 33 testes |
+| `npm run build` | Aprovado; 2.119 módulos transformados |
+| `npm run test` | Aprovado; 11 arquivos e 41 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Administração inspecionada com proprietário protegido, convite, revisão e auditoria |
 | PDF institucional | A4 renderizado e inspecionado; logo, métricas, tabela, rodapé e paginação aprovados |
 | Idiomas | Dashboard, relatórios e governança verificados em PT, EN e ES; exportação em espanhol confirmada |
+| Login condicional | Tela isolada verificada em PT, EN e ES, com logo institucional e sem erros no console |
 | Fluxo comercial | Conversão mapa → lead, criação e conclusão de atividade, criação e avanço de oportunidade validados no navegador |
 | Persistência demonstrativa | Registros criados permaneceram disponíveis entre módulos e recargas locais |
 | Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
-| GitHub Pages | URL atual responde HTTP 200; origem legacy `main`/raiz confirmada; workflow V2 preparado |
+| GitHub Pages | Publicação por workflow aprovada e URL pública validada com HTTP 200 |
+| Dependências de produção | `npm audit --omit=dev` aprovado; zero vulnerabilidades encontradas |
 
 ## Limite técnico identificado
 
 A consulta `firestore:databases:list --project d2-map-crm` retornou HTTP 403 para a sessão Firebase CLI autenticada como `dantefrota@gmail.com`. Portanto, não existem dados suficientes para verificar a edição e a região do Firestore.
 
-Até essa informação ser obtida com uma conta autorizada, regras, índices, adaptadores Firebase e migração de produção permanecem deliberadamente fora desta entrega. O contrato de sessão e governança já está implementado e testado sem persistência.
+Os adaptadores cliente foram implementados sem ativação. Até essa informação ser obtida com uma conta autorizada, regras, índices, Cloud Functions, testes do Emulator Suite e migração de produção permanecem fora da publicação.
 
 ## Estado da publicação
 
-A aplicação pública não foi alterada. A V2 está disponível localmente para revisão e usa fixtures mais alterações demonstrativas persistidas no navegador.
+A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` e continua usando dados demonstrativos persistidos no navegador. A fundação Firebase desta branch não modifica o comportamento público enquanto `VITE_CRM_BACKEND` permanecer como `demo`.
 
 ## Próximo marco
 
-Para homologação online, mesclar o PR e trocar a fonte do GitHub Pages para GitHub Actions. Para produção real, a conexão com Firebase Authentication, regras de acesso, logs e Emulator Suite continua dependente do acesso administrativo ao projeto Firebase correto e da confirmação da edição e região do banco.
+Para produção real, liberar acesso administrativo ao projeto `d2-map-crm`, confirmar edição e região, implementar `saveMembership`, regras, auditoria confiável e testes do Emulator Suite. Depois disso, substituir a persistência demonstrativa por repositórios comerciais e ativar `VITE_CRM_BACKEND=firebase` primeiro em homologação.
