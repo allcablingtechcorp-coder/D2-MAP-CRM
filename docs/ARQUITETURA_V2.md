@@ -16,6 +16,9 @@ A V2 está isolada em `v2/`. A aplicação publicada permanece intacta enquanto 
 | Autorização | `v2/src/domain/access.ts` | Papéis, permissões, escopos e proteção do proprietário |
 | Governança | `v2/src/domain/governance.ts` | Convites, revisão de mudanças, invariantes e contrato de auditoria |
 | Sessão | `v2/src/application/session.ts` | Estados de autenticação e portas para identidade e associações |
+| Workspace comercial | `v2/src/application/CrmWorkspace.tsx` | Estado compartilhado, comandos da interface e persistência local demonstrativa |
+| Regras de fluxo | `v2/src/domain/workflows.ts` | Criação de leads, duplicidade, transições de oportunidade e conclusão de atividades |
+| Métricas comerciais | `v2/src/domain/metrics.ts` | Indicadores de agenda, pipeline aberto e cobertura de atividades |
 | Administração | `v2/src/components/AdminGovernance.tsx` | Usuários, convites e auditoria com revisão explícita |
 | Fixtures | `v2/src/data/demo.ts` | Dados exclusivamente demonstrativos |
 | Sistema visual | `v2/src/styles.css` | Tokens, componentes, layouts e breakpoints responsivos |
@@ -44,6 +47,7 @@ A conta `allcablingtechcorp@gmail.com` está representada como `ownerProtected` 
 - Nenhuma credencial, usuário ou dado de produção foi modificado.
 - A interface de administração exige motivo, apresenta uma revisão antes da alteração e cria um evento demonstrativo. O backend futuro deverá repetir a autorização e gravar o evento de forma confiável.
 - Dados demonstrativos são identificados no topo da aplicação e não podem ser confundidos com dados reais.
+- O `localStorage` mantém somente o workspace demonstrativo neste marco; não é tratado como fonte confiável nem como persistência de produção.
 - O logo oficial presente no repositório é usado por um componente único e incorporado ao PDF; o relatório não depende de imagens externas.
 - Interface e PDF compartilham os mesmos catálogos em português, inglês e espanhol. A preferência é mantida em `localStorage` e atualiza o atributo `lang` do documento.
 - A integração real com Google Maps será conectada após autenticação, segregação por organização e políticas de uso estarem ativas.
