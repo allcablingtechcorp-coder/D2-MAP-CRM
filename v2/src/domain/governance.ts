@@ -15,7 +15,8 @@ export type GovernanceReason =
   | "reason_required"
   | "owner_invitation_forbidden"
   | "invalid_email"
-  | "duplicate_email";
+  | "duplicate_email"
+  | "team_required";
 
 export type GovernanceResult<T> =
   | { ok: true; value: T }
@@ -26,6 +27,7 @@ export interface MembershipPatch {
   status: MembershipStatus;
   scope: AccessScope;
   modules: ModuleId[];
+  teamIds: string[];
 }
 
 export interface MembershipChangeReview {
@@ -44,10 +46,19 @@ export interface Invitation {
   role: Exclude<RoleId, "owner">;
   scope: AccessScope;
   modules: ModuleId[];
+  teamIds?: string[];
   status: InvitationStatus;
   invitedByUid: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface Team {
+  id: string;
+  organizationId: string;
+  name: string;
+  memberUids: string[];
+  createdAt: string;
 }
 
 export interface InvitationInput {
@@ -61,6 +72,7 @@ export type AuditAction =
   | "auth.signed_in"
   | "auth.access_denied"
   | "membership.invited"
+  | "membership.invitation_accepted"
   | "membership.updated"
   | "membership.suspended"
   | "membership.revoked"
@@ -69,7 +81,10 @@ export type AuditAction =
   | "commercial.activity_created"
   | "commercial.activity_completed"
   | "commercial.opportunity_created"
-  | "commercial.opportunity_stage_changed";
+  | "commercial.opportunity_stage_changed"
+  | "commercial.company_created"
+  | "commercial.contact_created"
+  | "team.created";
 
 export interface AuditEvent {
   id: string;
@@ -77,7 +92,7 @@ export interface AuditEvent {
   action: AuditAction;
   actorUid: string;
   actorEmail: string;
-  targetType: "membership" | "invitation" | "report" | "session" | "lead" | "activity" | "opportunity";
+  targetType: "membership" | "invitation" | "report" | "session" | "lead" | "activity" | "opportunity" | "company" | "contact" | "team";
   targetId: string;
   summary: string;
   reason?: string;
@@ -104,6 +119,7 @@ export function reviewMembershipChange(
     return { ok: false, reason: isProtectedOwner(target) ? "protected_owner" : "actor_not_authorized" };
   }
   if (!reason.trim()) return { ok: false, reason: "reason_required" };
+  if (patch.scope === "assigned_teams" && patch.teamIds.length === 0) return { ok: false, reason: "team_required" };
 
   const removesOwner = target.role === "owner" && target.status === "active" && (patch.role !== "owner" || patch.status !== "active");
   const activeOwners = memberships.filter((member) => member.role === "owner" && member.status === "active");
@@ -115,9 +131,10 @@ export function reviewMembershipChange(
     status: patch.status,
     scope: patch.scope,
     modules: [...new Set(patch.modules)],
+    teamIds: [...new Set(patch.teamIds)],
   };
-  const changedFields = (["role", "status", "scope", "modules"] as const).filter((field) => {
-    if (field === "modules") return target.modules.join("|") !== after.modules.join("|");
+  const changedFields = (["role", "status", "scope", "modules", "teamIds"] as const).filter((field) => {
+    if (field === "modules" || field === "teamIds") return (target[field] ?? []).join("|") !== (after[field] ?? []).join("|");
     return target[field] !== after[field];
   });
 
@@ -162,7 +179,7 @@ export function buildAuditEvent(input: Omit<AuditEvent, "actorEmail"> & { actorE
 
 export function membershipChanges(review: MembershipChangeReview): AuditEvent["changes"] {
   return Object.fromEntries(review.changedFields.map((field) => [field, {
-    from: field === "modules" ? review.before.modules.join(", ") : String(review.before[field]),
-    to: field === "modules" ? review.after.modules.join(", ") : String(review.after[field]),
+    from: field === "modules" || field === "teamIds" ? (review.before[field] ?? []).join(", ") : String(review.before[field]),
+    to: field === "modules" || field === "teamIds" ? (review.after[field] ?? []).join(", ") : String(review.after[field]),
   }]));
 }

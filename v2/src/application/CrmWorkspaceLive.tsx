@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { demoActivities, demoLeads, demoOpportunities } from "../data/demo";
-import type { Activity, Lead, Opportunity, OpportunityStage } from "../domain/crm";
+import { demoActivities, demoCompanies, demoContacts, demoLeads, demoOpportunities } from "../data/demo";
+import type { Activity, Company, Contact, Lead, Opportunity, OpportunityStage } from "../domain/crm";
 import { useRuntimeSession } from "./SessionRuntime";
 import { workspaceStorageKey } from "./workspaceStorage";
 import { useI18n } from "../i18n/i18n";
@@ -16,11 +16,13 @@ interface CrmWorkspaceValue extends CommercialWorkspaceSnapshot {
   completeActivity: (id: string) => Promise<void>;
   addActivity: (activity: Omit<Activity, "id" | "completed">) => Promise<Activity | null>;
   addOpportunity: (opportunity: Omit<Opportunity, "id" | "stage" | "currency">) => Promise<Opportunity | null>;
+  addCompany: (company: Omit<Company, "id" | "ownerName" | "createdAt">) => Promise<Company | null>;
+  addContact: (contact: Omit<Contact, "id" | "ownerName" | "createdAt" | "companyName">) => Promise<Contact | null>;
   resetDemo: () => void;
 }
 
-const emptySnapshot = (): CommercialWorkspaceSnapshot => ({ leads: [], opportunities: [], activities: [] });
-const initialDemoSnapshot = (): CommercialWorkspaceSnapshot => ({ leads: demoLeads, opportunities: demoOpportunities, activities: demoActivities });
+const emptySnapshot = (): CommercialWorkspaceSnapshot => ({ leads: [], opportunities: [], activities: [], companies: [], contacts: [] });
+const initialDemoSnapshot = (): CommercialWorkspaceSnapshot => ({ leads: demoLeads, opportunities: demoOpportunities, activities: demoActivities, companies: demoCompanies, contacts: demoContacts });
 
 function loadDemoSnapshot(storageKey: string): CommercialWorkspaceSnapshot {
   try {
@@ -28,7 +30,7 @@ function loadDemoSnapshot(storageKey: string): CommercialWorkspaceSnapshot {
     if (!raw) return initialDemoSnapshot();
     const parsed = JSON.parse(raw) as Partial<CommercialWorkspaceSnapshot>;
     if (!Array.isArray(parsed.leads) || !Array.isArray(parsed.opportunities) || !Array.isArray(parsed.activities)) return initialDemoSnapshot();
-    return { leads: parsed.leads, opportunities: parsed.opportunities, activities: parsed.activities };
+    return { leads: parsed.leads, opportunities: parsed.opportunities, activities: parsed.activities, companies: Array.isArray(parsed.companies) ? parsed.companies : demoCompanies, contacts: Array.isArray(parsed.contacts) ? parsed.contacts : demoContacts };
   } catch { return initialDemoSnapshot(); }
 }
 
@@ -76,6 +78,18 @@ function DemoWorkspace({ children, storageKey }: { children: ReactNode; storageK
       const opportunity: Opportunity = { ...input, id: crypto.randomUUID(), stage: "discovery", currency: "USD" };
       setSnapshot((state) => ({ ...state, opportunities: [opportunity, ...state.opportunities] }));
       return opportunity;
+    },
+    addCompany: async (input) => {
+      const company: Company = { ...input, id: crypto.randomUUID(), ownerName: "Dante Frota", createdAt: new Date().toISOString() };
+      setSnapshot((state) => ({ ...state, companies: [company, ...state.companies] }));
+      return company;
+    },
+    addContact: async (input) => {
+      const company = snapshot.companies.find((item) => item.id === input.companyId);
+      if (!company) return null;
+      const contact: Contact = { ...input, id: crypto.randomUUID(), companyName: company.name, ownerName: company.ownerName, createdAt: new Date().toISOString() };
+      setSnapshot((state) => ({ ...state, contacts: [contact, ...state.contacts] }));
+      return contact;
     },
     resetDemo: () => setSnapshot(initialDemoSnapshot()),
   }), [snapshot]);
@@ -145,6 +159,24 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
         const opportunity = await repository.createOpportunity(input);
         setSnapshot((state) => ({ ...state, opportunities: [opportunity, ...state.opportunities] }));
         return opportunity;
+      } catch { setRemoteError(true); return null; }
+    },
+    addCompany: async (input) => {
+      if (!allowed("lead.create")) return null;
+      setRemoteError(false);
+      try {
+        const company = await repository.createCompany(input);
+        setSnapshot((state) => ({ ...state, companies: [company, ...state.companies] }));
+        return company;
+      } catch { setRemoteError(true); return null; }
+    },
+    addContact: async (input) => {
+      if (!allowed("lead.create")) return null;
+      setRemoteError(false);
+      try {
+        const contact = await repository.createContact(input);
+        setSnapshot((state) => ({ ...state, contacts: [contact, ...state.contacts] }));
+        return contact;
       } catch { setRemoteError(true); return null; }
     },
     resetDemo: () => undefined,

@@ -27,6 +27,7 @@ export interface MembershipPatch {
   status: MembershipStatus;
   scope: AccessScope;
   modules: ModuleId[];
+  teamIds: string[];
 }
 
 export interface SaveMembershipInput {
@@ -62,12 +63,13 @@ export function parseSaveMembershipInput(value: unknown): SaveMembershipInput {
   if (!isRecord(value)) throw new InputValidationError("Request data must be an object");
   requireExactKeys(value, ["organizationId", "targetUid", "patch", "reason"], "Request data");
   if (!isRecord(value.patch)) throw new InputValidationError("patch is invalid");
-  requireExactKeys(value.patch, ["role", "status", "scope", "modules"], "patch");
+  requireExactKeys(value.patch, ["role", "status", "scope", "modules", "teamIds"], "patch");
 
   const role = value.patch.role;
   const status = value.patch.status;
   const scope = value.patch.scope;
   const moduleValues = value.patch.modules;
+  const teamIds = value.patch.teamIds;
   const reason = typeof value.reason === "string" ? value.reason.trim() : "";
 
   if (!isOneOf(role, roles)) throw new InputValidationError("patch.role is invalid");
@@ -76,12 +78,16 @@ export function parseSaveMembershipInput(value: unknown): SaveMembershipInput {
   if (!Array.isArray(moduleValues) || moduleValues.length === 0 || moduleValues.some((item) => !isOneOf(item, modules))) {
     throw new InputValidationError("patch.modules is invalid");
   }
+  if (!Array.isArray(teamIds) || teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item))) {
+    throw new InputValidationError("patch.teamIds is invalid");
+  }
+  if (scope === "assigned_teams" && teamIds.length === 0) throw new InputValidationError("patch.teamIds requires at least one team for assigned_teams scope");
   if (!reason || reason.length > 500) throw new InputValidationError("reason is required and must contain at most 500 characters");
 
   return {
     organizationId: requiredIdentifier(value.organizationId, "organizationId"),
     targetUid: requiredIdentifier(value.targetUid, "targetUid"),
-    patch: { role, status, scope, modules: [...new Set(moduleValues)] },
+    patch: { role, status, scope, modules: [...new Set(moduleValues)], teamIds: [...new Set(teamIds)] },
     reason,
   };
 }
@@ -140,7 +146,7 @@ export function removesActiveOwner(before: MembershipDocument, patch: Membership
 
 export function membershipChanges(before: MembershipDocument, patch: MembershipPatch): Record<string, { from: unknown; to: unknown }> {
   const changes: Record<string, { from: unknown; to: unknown }> = {};
-  for (const field of ["role", "status", "scope", "modules"] as const) {
+  for (const field of ["role", "status", "scope", "modules", "teamIds"] as const) {
     const from = before[field];
     const to = patch[field];
     if (JSON.stringify(from) !== JSON.stringify(to)) changes[field] = { from, to };

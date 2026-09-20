@@ -38,6 +38,24 @@ export interface CreateOpportunityInput {
   expectedCloseAt: string;
 }
 
+export interface CreateCompanyInput {
+  organizationId: string;
+  name: string;
+  location: string;
+  industry: string;
+  website: string;
+  phone: string;
+}
+
+export interface CreateContactInput {
+  organizationId: string;
+  companyId: string;
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+}
+
 export interface RecordCommandInput {
   organizationId: string;
   recordId: string;
@@ -89,6 +107,12 @@ function text(value: unknown, name: string, maxLength: number): string {
   const result = typeof value === "string" ? value.trim() : "";
   if (!result || result.length > maxLength) throw new InputValidationError(`${name} is invalid`);
   return result;
+}
+
+function optionalText(value: unknown, name: string, maxLength: number): string {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string" || value.trim().length > maxLength) throw new InputValidationError(`${name} is invalid`);
+  return value.trim();
 }
 
 function isoDate(value: unknown, name: string): string {
@@ -175,6 +199,34 @@ export function parseCreateOpportunityInput(value: unknown): CreateOpportunityIn
     amountCents: input.amountCents === null ? null : Number(input.amountCents),
     nextAction: text(input.nextAction, "nextAction", 500),
     expectedCloseAt: dateOnly(input.expectedCloseAt, "expectedCloseAt"),
+  };
+}
+
+export function parseCreateCompanyInput(value: unknown): CreateCompanyInput {
+  const input = requestObject(value, ["organizationId", "name", "location", "industry", "website", "phone"]);
+  const website = optionalText(input.website, "website", 300);
+  if (website && !/^https?:\/\//i.test(website)) throw new InputValidationError("website is invalid");
+  return {
+    organizationId: identifier(input.organizationId, "organizationId"),
+    name: text(input.name, "name", 200),
+    location: text(input.location, "location", 300),
+    industry: optionalText(input.industry, "industry", 120),
+    website,
+    phone: optionalText(input.phone, "phone", 50),
+  };
+}
+
+export function parseCreateContactInput(value: unknown): CreateContactInput {
+  const input = requestObject(value, ["organizationId", "companyId", "name", "title", "email", "phone"]);
+  const email = optionalText(input.email, "email", 254).toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputValidationError("email is invalid");
+  return {
+    organizationId: identifier(input.organizationId, "organizationId"),
+    companyId: identifier(input.companyId, "companyId"),
+    name: text(input.name, "name", 200),
+    title: optionalText(input.title, "title", 120),
+    email,
+    phone: optionalText(input.phone, "phone", 50),
   };
 }
 

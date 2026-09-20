@@ -49,6 +49,7 @@ export interface Membership {
   status: MembershipStatus;
   scope: AccessScope;
   modules: ModuleId[];
+  teamIds?: string[];
   permissionOverrides?: Partial<Record<Permission, boolean>>;
   ownerProtected?: boolean;
 }

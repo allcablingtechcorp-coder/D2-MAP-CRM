@@ -1,4 +1,4 @@
-import type { Activity, Lead, Opportunity } from "../domain/crm.ts";
+import type { Activity, Company, Contact, Lead, Opportunity } from "../domain/crm.ts";
 import type { Membership } from "../domain/access.ts";
 
 // These fixtures are loaded only by the design prototype. They are visibly marked in the UI.
@@ -129,6 +129,29 @@ export const demoActivities: Activity[] = [
     completed: false,
   },
 ];
+
+export const demoCompanies: Company[] = demoLeads.map((lead) => ({
+  id: `company-${lead.id}`,
+  name: lead.companyName,
+  location: lead.location,
+  ownerName: lead.ownerName,
+  industry: "",
+  website: "",
+  phone: "",
+  createdAt: lead.lastActivityAt,
+}));
+
+export const demoContacts: Contact[] = demoCompanies.slice(0, 3).map((company, index) => ({
+  id: `contact-${index + 1}`,
+  companyId: company.id,
+  companyName: company.name,
+  name: ["Alex Morgan", "Jordan Lee", "Taylor Rivera"][index]!,
+  title: "Facilities",
+  email: "",
+  phone: "",
+  ownerName: company.ownerName,
+  createdAt: company.createdAt,
+}));
 
 export const demoMemberships: Membership[] = [
   {

@@ -1,4 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
@@ -14,14 +15,15 @@ import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orde
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
-import type { AuditAction, AuditEvent } from "../../domain/governance";
-import type { Activity, Lead, Opportunity, OpportunityStage } from "../../domain/crm";
+import type { AuditAction, AuditEvent, Invitation, InvitationInput, Team } from "../../domain/governance";
+import type { Activity, Company, Contact, Lead, Opportunity, OpportunityStage } from "../../domain/crm";
 import type { LeadInput } from "../../domain/workflows";
 import type { CommercialRepository, CommercialWorkspaceSnapshot } from "../../application/commercial";
 import type { FirebaseRuntimeConfig } from "./config";
 import { membershipFromDocument } from "./membershipDocument";
 
 const firebaseAppName = "d2-crm-v2";
+const appCheckInitialized = new Set<string>();
 
 export function identityFromFirebaseUser(user: Pick<User, "uid" | "email" | "displayName" | "photoURL">): AuthIdentity {
   if (!user.email) throw new Error("The authenticated identity has no email address");
@@ -90,6 +92,9 @@ export class FirestoreMembershipRepository implements MembershipRepository {
       "membership.updated": "admin.auditAccessUpdated", "membership.suspended": "admin.auditAccessUpdated", "membership.revoked": "admin.auditAccessUpdated",
       "commercial.lead_created": "admin.auditLeadCreated", "commercial.activity_created": "admin.auditActivityCreated", "commercial.activity_completed": "admin.auditActivityCompleted",
       "commercial.opportunity_created": "admin.auditOpportunityCreated", "commercial.opportunity_stage_changed": "admin.auditOpportunityStageChanged",
+      "commercial.company_created": "admin.auditCompanyCreated", "commercial.contact_created": "admin.auditContactCreated",
+      "team.created": "admin.auditTeamCreated", "membership.invitation_accepted": "admin.auditInvitationAccepted",
+      "membership.invited": "admin.auditInvitationCreated", "auth.signed_in": "admin.auditSignedIn", "auth.access_denied": "admin.auditAccessDenied",
     };
     return snapshot.docs.map((entry) => {
       const data = entry.data();
@@ -115,7 +120,7 @@ export class FirestoreMembershipRepository implements MembershipRepository {
       {
         organizationId: string;
         targetUid: string;
-        patch: Pick<Membership, "role" | "status" | "scope" | "modules">;
+        patch: Pick<Membership, "role" | "status" | "scope" | "modules" | "teamIds">;
         reason: string;
       },
       { saved: true; auditEventId: string }
@@ -128,13 +133,39 @@ export class FirestoreMembershipRepository implements MembershipRepository {
         status: membership.status,
         scope: membership.scope,
         modules: membership.modules,
+        teamIds: membership.teamIds ?? [],
       },
       reason,
     });
   }
+
+  async listGovernanceDirectory(): Promise<{ invitations: Invitation[]; teams: Team[] }> {
+    const callable = httpsCallable<{ organizationId: string }, { invitations: Invitation[]; teams: Team[] }>(this.functions, "listGovernanceDirectory");
+    return (await callable({ organizationId: this.organizationId })).data;
+  }
+
+  async createInvitation(input: InvitationInput & { teamIds: string[] }): Promise<Invitation> {
+    const callable = httpsCallable<{ organizationId: string; email: string; role: InvitationInput["role"]; scope: InvitationInput["scope"]; modules: InvitationInput["modules"]; teamIds: string[] }, { invitation: Invitation }>(this.functions, "createGovernanceInvitation");
+    return (await callable({ organizationId: this.organizationId, ...input })).data.invitation;
+  }
+
+  async createTeam(name: string): Promise<Team> {
+    const callable = httpsCallable<{ organizationId: string; name: string }, { team: Team }>(this.functions, "createGovernanceTeam");
+    return (await callable({ organizationId: this.organizationId, name })).data.team;
+  }
+
+  async acceptInvitation(): Promise<boolean> {
+    const callable = httpsCallable<{ organizationId: string }, { accepted: boolean }>(this.functions, "acceptGovernanceInvitation");
+    return (await callable({ organizationId: this.organizationId })).data.accepted;
+  }
+
+  async recordSessionEvent(event: "signed_in" | "access_denied"): Promise<void> {
+    const callable = httpsCallable<{ organizationId: string; event: "signed_in" | "access_denied" }, { recorded: true }>(this.functions, "recordSessionEvent");
+    await callable({ organizationId: this.organizationId, event });
+  }
 }
 
-type CallableWorkspace = { leads: Lead[]; opportunities: Opportunity[]; activities: Activity[] };
+type CallableWorkspace = { leads: Lead[]; opportunities: Opportunity[]; activities: Activity[]; companies: Company[]; contacts: Contact[] };
 
 export class FirebaseCommercialRepository implements CommercialRepository {
   constructor(private readonly functions: Functions, private readonly organizationId: string) {}
@@ -178,6 +209,17 @@ export class FirebaseCommercialRepository implements CommercialRepository {
     const callable = httpsCallable<{ organizationId: string; recordId: string }, { activity: Activity }>(this.functions, "completeCommercialActivity");
     return (await callable({ organizationId: this.organizationId, recordId: id })).data.activity;
   }
+
+  async createCompany(input: Omit<Company, "id" | "ownerName" | "createdAt">): Promise<Company> {
+    const callable = httpsCallable<{ organizationId: string; name: string; location: string; industry: string; website: string; phone: string }, { company: Company }>(this.functions, "createCommercialCompany");
+    return (await callable({ organizationId: this.organizationId, ...input })).data.company;
+  }
+
+  async createContact(input: Omit<Contact, "id" | "ownerName" | "createdAt" | "companyName">): Promise<Contact> {
+    const callable = httpsCallable<{ organizationId: string; companyId: string; name: string; title: string; email: string; phone: string }, { contact: Contact }>(this.functions, "createCommercialContact");
+    return (await callable({ organizationId: this.organizationId, ...input })).data.contact;
+  }
+
 }
 
 function initializeFirebaseApp(config: FirebaseRuntimeConfig): FirebaseApp {
@@ -192,6 +234,10 @@ export function createFirebaseGateways(config: FirebaseRuntimeConfig): {
   commercial: CommercialRepository;
 } {
   const app = initializeFirebaseApp(config);
+  if (config.appCheckSiteKey && !appCheckInitialized.has(app.name)) {
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(config.appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+    appCheckInitialized.add(app.name);
+  }
   const functions = getFunctions(app, config.functionsRegion);
   return {
     auth: new FirebaseAuthGateway(getAuth(app)),

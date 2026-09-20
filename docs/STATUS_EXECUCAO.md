@@ -2,9 +2,9 @@
 
 ## Resultado da auditoria
 
-A auditoria de segurança e arquitetura foi concluída nesta etapa. Parecer: **homologação controlada, sem aprovação para operação comercial multiusuário**. As correções e os critérios de conclusão estão em `docs/AUDITORIA_SEGURANCA_ARQUITETURA.md`.
+A implementação dos blocos comerciais e de governança foi concluída e está em validação para publicação. A auditoria anterior permanece preservada em `docs/AUDITORIA_SEGURANCA_ARQUITETURA.md`; este documento registra o estado posterior às correções.
 
-Corrigidos atualização de sessão após revogação, logout, negações de permissões no servidor, validação da configuração de produção e respostas atrasadas do mapa. A primeira etapa da persistência comercial foi conectada ao Firebase para leads, oportunidades e atividades, com comandos no servidor, escopo por organização/registro/equipe e auditoria. App Check, convites reais, logs de login, empresas/contatos próprios, atribuição administrativa de equipes e recuperação de dados ainda precisam ser implementados.
+Além de leads, oportunidades e atividades, empresas e contatos agora têm coleções e comandos próprios no Firebase. O painel administrativo possui equipes, seleção de módulos e equipes por associação, convites persistentes com aceite único e eventos idempotentes de login e acesso negado. O cliente está preparado para App Check quando a chave reCAPTCHA Enterprise for configurada; o enforcement permanece desligado até existirem métricas válidas em produção.
 
 ## Entrega concluída
 
@@ -68,6 +68,12 @@ Corrigidos atualização de sessão após revogação, logout, negações de per
 - Adicionada auditoria comercial para criação e alteração de registros.
 - Alterado o idioma inicial para inglês, mantendo preferência PT/EN/ES persistida no navegador.
 - Substituídos emojis por bandeiras SVG do Brasil, Estados Unidos e Espanha no seletor de idioma.
+- Implementadas entidades próprias de empresas e contatos, com formulários, autorização por escopo e auditoria no servidor.
+- Novos leads criam a empresa correspondente de forma transacional quando ela ainda não existe.
+- Implementados cadastro de equipes, atribuição de `teamIds` e seleção granular dos oito módulos por usuário.
+- Implementados convites Firebase persistentes, expiração de sete dias, rejeição de duplicidade e aceite vinculado ao e-mail autenticado.
+- Implementados eventos idempotentes de login e acesso negado, sempre com ator e horário derivados no servidor.
+- Preparada a inicialização opcional do Firebase App Check com reCAPTCHA Enterprise por variável de ambiente.
 
 ## Evidências de validação
 
@@ -86,7 +92,7 @@ Corrigidos atualização de sessão após revogação, logout, negações de per
 | Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
 | GitHub Pages | Publicação por workflow aprovada e URL pública validada com HTTP 200 |
 | Dependências de produção | `npm audit --omit=dev` aprovado; zero vulnerabilidades encontradas |
-| Política das Functions | 14 testes aprovados |
+| Política das Functions | 17 testes aprovados |
 | Regras Firestore | 10 testes aprovados no Emulator Suite com JRE 21 |
 | Build das Functions | TypeScript aprovado para Node.js 22 |
 | Ativação Firebase pública | Workflow aprovado; autenticação Google e workspace autenticado carregados na URL pública |
@@ -98,7 +104,7 @@ Corrigidos atualização de sessão após revogação, logout, negações de per
 
 ## Limite técnico identificado
 
-Leads, oportunidades e atividades já possuem persistência Firebase por comandos autenticados. A base de empresas ainda é derivada dos leads e não existe coleção própria de contatos. Atribuição por equipe está protegida no servidor, mas depende do editor de equipes e dos `teamIds` das associações para ser operável. O modo demonstrativo local continua disponível somente quando o aplicativo é iniciado explicitamente em modo demo.
+Leads, oportunidades, atividades, empresas, contatos, equipes, associações e convites possuem persistência Firebase por comandos autenticados. O modo demonstrativo local continua disponível somente quando o aplicativo é iniciado explicitamente em modo demo.
 
 O carregamento assíncrono foi corrigido. A migração de `PlacesService` e `google.maps.Marker` para `Place` e `AdvancedMarkerElement` continua pendente, com validação de APIs, map ID, quotas e custos. O mapa interativo é preservado.
 
@@ -106,8 +112,8 @@ O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dep
 
 ## Estado da publicação
 
-A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login, governança e persistência Firebase ativos. O workflow do GitHub Pages foi aprovado e as seis Functions comerciais estão implantadas em `us-central1` com Node.js 22.
+A versão pública anterior permanece ativa em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`. Esta atualização será considerada publicada somente após o workflow do GitHub Pages e a implantação das novas Functions concluírem com sucesso.
 
 ## Próximo marco
 
-Concluir o bloco 1 em SOL HIGH com entidades próprias de empresas/contatos, editor de equipes, atribuição controlada e testes transacionais das callables. Depois executar convites, auditoria de login e preparação operacional. Usar Astra HIGH novamente na revisão da versão candidata, conforme critérios do relatório.
+Publicar a versão candidata e executar a auditoria final em **Astra HIGH**. App Check só poderá ser imposto depois de configurar a chave reCAPTCHA Enterprise e observar tokens válidos; backup e restauração exigem política operacional externa ao código.

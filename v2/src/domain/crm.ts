@@ -37,6 +37,29 @@ export interface Activity {
   completed: boolean;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  location: string;
+  ownerName: string;
+  industry: string;
+  website: string;
+  phone: string;
+  createdAt: string;
+}
+
+export interface Contact {
+  id: string;
+  companyId: string;
+  companyName: string;
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  ownerName: string;
+  createdAt: string;
+}
+
 export const qualificationLabels: Record<LeadQualification, string> = {
   new: "Novo",
   contacting: "Em contato",

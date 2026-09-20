@@ -2,6 +2,10 @@
 
 Data: 20 de setembro de 2026. Base examinada: commit `694eced`, com correções na branch `codex/security-audit-hardening`.
 
+## Atualização da versão candidata
+
+As pendências P1 identificadas nesta auditoria foram implementadas na versão candidata posterior: empresas e contatos próprios, editor de equipes, `teamIds`, módulos editáveis, convites persistentes com aceite vinculado ao e-mail Google, logs idempotentes de login e acesso negado e auditoria dos novos comandos. O cliente também aceita configuração opcional do App Check por reCAPTCHA Enterprise. O parecer abaixo descreve fielmente o estado do commit auditado e deve ser reavaliado em Astra HIGH sobre a versão publicada.
+
 ## Parecer
 
 **Liberado para homologação controlada; não aprovado para operação comercial multiusuário.**
