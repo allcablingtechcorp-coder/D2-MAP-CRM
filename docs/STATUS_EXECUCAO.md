@@ -1,3 +1,11 @@
+# Estado atual — versão candidata auditada
+
+**Referência vigente: [Auditoria de 20/09/2026](AUDITORIA_FINAL_2026-09-20.md).** A auditoria encontrou defeitos na versão anteriormente publicada e corrigiu as transações de permissões, convites, logs, isolamento de módulos e métricas. A publicação permite homologação dos fluxos existentes; a conclusão comercial integral continua condicionada às pendências descritas nesse documento.
+
+Abaixo está o histórico das entregas; números de testes, pareceres e recomendações anteriores não substituem o relatório vigente.
+
+---
+
 # Status de execução — 20 de setembro de 2026
 
 ## Resultado da auditoria

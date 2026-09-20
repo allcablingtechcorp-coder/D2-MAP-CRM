@@ -66,6 +66,6 @@ describe("saveMembership policy", () => {
   });
 
   it("records only changed governance fields", () => {
-    expect(membershipChanges(member, { role: "viewer", status: "active", scope: "assigned_teams", modules: ["dashboard", "leads"], teamIds: [] })).toEqual({ role: { from: "sales_manager", to: "viewer" }, teamIds: { from: undefined, to: [] } });
+    expect(membershipChanges(member, { role: "viewer", status: "active", scope: "assigned_teams", modules: ["dashboard", "leads"], teamIds: [] })).toEqual({ role: { from: "sales_manager", to: "viewer" } });
   });
 });

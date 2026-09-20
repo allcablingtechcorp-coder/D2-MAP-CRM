@@ -260,3 +260,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .topbar { height: 62px; }.global-search { display: none; }.global-search kbd { display: none; }.page-header { align-items: stretch; flex-direction: column; }.page-actions .action-button { width: 100%; }.metrics-grid, .metrics-grid.compact { grid-template-columns: 1fr; }.metric-card { min-height: 112px; }.toolbar { flex-wrap: wrap; }.table-search { flex-basis: 100%; min-width: 0; }.pipeline-row { grid-template-columns: 1fr 1fr; }.pipeline-row small { display: none; }.attention-item { grid-template-columns: 36px 1fr auto; }.attention-item > strong, .attention-item > time { display: none; }.company-grid { grid-template-columns: 1fr; }.prospecting-shell { margin-inline: -7px; }.map-canvas { min-height: 480px; }.map-notice { left: 10px; right: auto; }.donut-layout { flex-direction: column; }.report-catalog { grid-template-columns: 1fr; }.access-actions { flex-direction: column-reverse; }.access-actions .action-button { width: 100%; }
   .report-brand-banner { align-items: flex-start; flex-direction: column; gap: 10px; }.report-brand-banner .brand-lockup { padding-right: 0; border-right: 0; }.report-period { margin-left: 0; }.governance-tabs { width: 100%; overflow-x: auto; }.governance-tabs button { flex: 1 0 auto; }.audit-list article { grid-template-columns: 34px 1fr; }.audit-list time { grid-column: 2; }.governance-modal footer { flex-direction: column-reverse; }.governance-modal footer .action-button { width: 100%; }
 }
+
+.topbar-title { flex: 1; color: #253550; font-size: 14px; }
+.company-card > a { display: block; overflow-wrap: anywhere; margin-top: 5px; font-size: 11px; color: #2d64d8; }
+.company-contact-preview > div { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid #edf1f5; }
+.company-contact-preview a { color: #2d64d8; overflow-wrap: anywhere; }
+.bar-chart > div { grid-template-columns: minmax(90px, 1fr) 2fr 25px; }
+.lost-action { margin-top: 10px; color: #a84343; }
+.stage-pill.won { background: #e9f7f0; color: #16815b; }
+.stage-pill.lost { background: #fceeee; color: #a84343; }
+
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }

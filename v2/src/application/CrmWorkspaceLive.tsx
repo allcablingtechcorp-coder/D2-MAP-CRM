@@ -39,7 +39,7 @@ const CrmWorkspaceContext = createContext<CrmWorkspaceValue | null>(null);
 export function CrmWorkspaceProvider({ children }: { children: ReactNode }) {
   const runtime = useRuntimeSession();
   return runtime.mode === "firebase"
-    ? <FirebaseWorkspace repository={runtime.commercial} membership={runtime.membership}>{children}</FirebaseWorkspace>
+    ? <FirebaseWorkspace key={JSON.stringify(runtime.membership)} repository={runtime.commercial} membership={runtime.membership}>{children}</FirebaseWorkspace>
     : <DemoWorkspace storageKey={workspaceStorageKey()}>{children}</DemoWorkspace>;
 }
 
@@ -102,14 +102,16 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
   const [snapshot, setSnapshot] = useState<CommercialWorkspaceSnapshot>(emptySnapshot);
   const [loading, setLoading] = useState(true);
   const [remoteError, setRemoteError] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<"capacity" | "network" | null>(null);
+  const [reload, setReload] = useState(0);
   const allowed = (permission: Permission) => canPerformCommercialAction(membership, permission);
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setRemoteError(false);
-    repository.load().then((loaded) => { if (active) setSnapshot(loaded); }).catch(() => { if (active) setRemoteError(true); }).finally(() => { if (active) setLoading(false); });
+    setLoading(true); setRemoteError(false); setLoadFailure(null);
+    repository.load().then((loaded) => { if (active) setSnapshot(loaded); }).catch((error: { code?: string }) => { if (active) setLoadFailure(error.code === "functions/resource-exhausted" ? "capacity" : "network"); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [repository]);
+  }, [repository, reload]);
 
   const value = useMemo<CrmWorkspaceValue>(() => ({
     ...snapshot, loading, can: allowed,
@@ -118,7 +120,10 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
       setRemoteError(false);
       try {
         const result = await repository.createLead(input);
-        if (result.ok) setSnapshot((state) => ({ ...state, leads: [result.lead, ...state.leads] }));
+        if (result.ok) {
+          setSnapshot((state) => ({ ...state, leads: [result.lead, ...state.leads] }));
+          try { setSnapshot(await repository.load()); } catch { setRemoteError(true); }
+        }
         return result;
       } catch { setRemoteError(true); return { ok: false, reason: "server_error" }; }
     },
@@ -148,7 +153,7 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
       setRemoteError(false);
       try {
         const activity = await repository.createActivity(input);
-        setSnapshot((state) => ({ ...state, activities: [activity, ...state.activities], leads: state.leads.map((lead) => lead.companyName === activity.companyName ? { ...lead, lastActivityAt: new Date().toISOString() } : lead) }));
+        setSnapshot((state) => ({ ...state, activities: [activity, ...state.activities] }));
         return activity;
       } catch { setRemoteError(true); return null; }
     },
@@ -182,6 +187,8 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
     resetDemo: () => undefined,
   }), [snapshot, loading, membership, repository]);
 
+  if (loadFailure) return <div className="governance-feedback error" role="alert"><p>{t(loadFailure === "capacity" ? "audit.capacityError" : "workspace.remoteError")}</p><button className="action-button secondary" onClick={() => setReload((value) => value + 1)}>{t("audit.retry")}</button></div>;
+  if (loading) return <div className="workflow-feedback" role="status">{t("workspace.loading")}</div>;
   return <CrmWorkspaceContext.Provider value={value}>{loading && <div className="workflow-feedback" role="status">{t("workspace.loading")}</div>}{remoteError && <div className="governance-feedback error" role="alert">{t("workspace.remoteError")}</div>}{children}</CrmWorkspaceContext.Provider>;
 }
 
