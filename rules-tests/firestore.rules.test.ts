@@ -26,7 +26,7 @@ function membership(role: string, status = "active") {
     role,
     status,
     scope: "organization",
-    modules: ["dashboard"],
+    modules: ["dashboard", "admin"],
   };
 }
 
@@ -46,6 +46,9 @@ beforeEach(async () => {
       setDoc(doc(database, membershipPath("operations")), membership("operations_admin")),
       setDoc(doc(database, membershipPath("representative")), membership("sales_rep")),
       setDoc(doc(database, membershipPath("suspended")), membership("sales_rep", "suspended")),
+      setDoc(doc(database, membershipPath("suspended-admin")), membership("operations_admin", "suspended")),
+      setDoc(doc(database, membershipPath("no-admin-module")), { ...membership("owner"), modules: ["dashboard"] }),
+      setDoc(doc(database, membershipPath("denied-admin")), { ...membership("owner"), permissionOverrides: { "membership.read": false, "audit.read": false } }),
       setDoc(doc(database, `organizations/${organizationId}/invitations/invite-1`), { email: "new@example.com" }),
       setDoc(doc(database, `organizations/${organizationId}/auditEvents/audit-1`), { action: "membership.updated" }),
       setDoc(doc(database, `organizations/${organizationId}`), { name: "D2 Group" }),
@@ -80,7 +83,7 @@ describe("Firestore governance rules", () => {
 
   it("rejects membership lists for sales users and suspended administrators", async () => {
     const representativeDatabase = environment.authenticatedContext("representative").firestore();
-    const suspendedAdminDatabase = environment.authenticatedContext("suspended").firestore();
+    const suspendedAdminDatabase = environment.authenticatedContext("suspended-admin").firestore();
     await assertFails(getDocs(collection(representativeDatabase, `organizations/${organizationId}/memberships`)));
     await assertFails(getDocs(collection(suspendedAdminDatabase, `organizations/${organizationId}/memberships`)));
   });
@@ -110,5 +113,27 @@ describe("Firestore governance rules", () => {
     const ownerDatabase = environment.authenticatedContext("owner").firestore();
     await assertFails(getDoc(doc(ownerDatabase, "users/legacy-user")));
     await assertFails(getDoc(doc(ownerDatabase, `organizations/${organizationId}/leads/lead-1`)));
+  });
+
+  it("honors denied permissions and removed admin modules on the server", async () => {
+    for (const uid of ["no-admin-module", "denied-admin"]) {
+      const db = environment.authenticatedContext(uid).firestore();
+      await assertFails(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
+      await assertFails(getDocs(collection(db, `organizations/${organizationId}/auditEvents`)));
+      await assertSucceeds(getDoc(doc(db, membershipPath(uid))));
+    }
+  });
+
+  it("denies cross-organization reads even for an owner", async () => {
+    const db = environment.authenticatedContext("owner").firestore();
+    await assertFails(getDocs(collection(db, "organizations/another-organization/memberships")));
+    await assertFails(getDoc(doc(db, "organizations/another-organization/auditEvents/event")));
+  });
+
+  it("revokes administrative reads after suspension", async () => {
+    const db = environment.authenticatedContext("operations").firestore();
+    await assertSucceeds(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
+    await environment.withSecurityRulesDisabled(async (context) => updateDoc(doc(context.firestore(), membershipPath("operations")), { status: "suspended" }));
+    await assertFails(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
   });
 });

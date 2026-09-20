@@ -12,7 +12,7 @@ export interface LeadInput {
 
 export type LeadCreationResult =
   | { ok: true; lead: Lead }
-  | { ok: false; reason: "required_fields" | "invalid_date" | "duplicate"; duplicate?: Lead };
+  | { ok: false; reason: "required_fields" | "invalid_date" | "duplicate" | "permission_denied"; duplicate?: Lead };
 
 export type OpportunityTransitionResult =
   | { ok: true; opportunity: Opportunity; from: OpportunityStage; to: OpportunityStage }

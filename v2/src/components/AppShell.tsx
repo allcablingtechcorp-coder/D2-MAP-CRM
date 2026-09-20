@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleHelp,
   LayoutDashboard,
+  LogOut,
   MapPinned,
   Menu,
   Search,
@@ -43,6 +44,8 @@ interface AppShellProps {
   availableModules?: readonly ModuleId[];
   account?: { displayName: string; detail: string };
   environmentLabel?: string;
+  onSignOut?: () => Promise<void>;
+  sessionError?: boolean;
   children: ReactNode;
 }
 
@@ -54,6 +57,8 @@ export function AppShell({
   availableModules,
   account,
   environmentLabel,
+  onSignOut,
+  sessionError,
   children,
 }: AppShellProps) {
   const { locale, setLocale, t } = useI18n();
@@ -109,6 +114,8 @@ export function AppShell({
             </div>
             <ChevronDown size={16} aria-hidden="true" />
           </div>
+          {onSignOut && <button className="nav-item" onClick={() => { void onSignOut(); }}><LogOut size={18} /><span>{t("auth.signOut")}</span></button>}
+          {sessionError && <p role="alert">{t("auth.operationError")}</p>}
         </div>
       </aside>
 

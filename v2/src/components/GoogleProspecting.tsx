@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, MapPin, Plus, Route, Search, Sparkles } from "lucide-react";
 import { useI18n, type TranslationKey } from "../i18n/i18n";
+import { useCrmWorkspace } from "../application/CrmWorkspace";
 import { LeadDialog } from "./CommercialDialogs";
 import { PageHeader } from "./AppShell";
 
@@ -19,18 +20,21 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
   if (window.google?.maps?.places) return Promise.resolve();
   if (googleMapsLoader) return googleMapsLoader;
   googleMapsLoader = new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>("script[data-d2-google-maps]");
-    const script = existing ?? document.createElement("script");
-    const complete = () => window.google?.maps?.places ? resolve() : reject(new Error("Google Maps did not initialize"));
-    script.addEventListener("load", complete, { once: true });
-    script.addEventListener("error", () => reject(new Error("Google Maps failed to load")), { once: true });
-    if (!existing) {
-      script.dataset.d2GoogleMaps = "true";
-      script.async = true;
-      script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly`;
-      document.head.append(script);
-    }
+    const script = document.createElement("script");
+    const callbackName = `d2MapsReady${Date.now()}`;
+    const callbacks = window as unknown as Record<string, unknown>;
+    const timer = window.setTimeout(() => fail(), 30000);
+    const clean = () => { window.clearTimeout(timer); delete callbacks[callbackName]; };
+    const fail = () => { clean(); script.remove(); googleMapsLoader = null; reject(new Error("Google Maps failed to load")); };
+    callbacks[callbackName] = () => {
+      if (!window.google?.maps?.places) { fail(); return; }
+      clean(); resolve();
+    };
+    script.addEventListener("error", fail, { once: true });
+    script.dataset.d2GoogleMaps = "true";
+    script.async = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly&loading=async&callback=${callbackName}`;
+    document.head.append(script);
   });
   return googleMapsLoader;
 }
@@ -50,12 +54,14 @@ function commercialScore(place: google.maps.places.PlaceResult): number {
 
 export function GoogleProspecting() {
   const { t } = useI18n();
+  const { can } = useCrmWorkspace();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() ?? "";
   const mapElement = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const places = useRef<google.maps.places.PlacesService | null>(null);
   const markers = useRef<google.maps.Marker[]>([]);
   const infoWindow = useRef<google.maps.InfoWindow | null>(null);
+  const searchRevision = useRef(0);
   const [ready, setReady] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<"" | "configuration" | "load" | "search">("");
@@ -91,6 +97,7 @@ export function GoogleProspecting() {
       .catch(() => { if (active) setError("load"); });
     return () => {
       active = false;
+      searchRevision.current++;
       markers.current.forEach((marker) => marker.setMap(null));
     };
   }, [apiKey]);
@@ -119,14 +126,23 @@ export function GoogleProspecting() {
     if (!ready || !places.current || !map.current || !queryText.trim() || !locationText.trim()) return;
     setSearching(true);
     setError("");
+    const revision = ++searchRevision.current;
+    markers.current.forEach((marker) => marker.setMap(null));
+    markers.current = [];
+    infoWindow.current?.close();
+    setResults([]);
+    setLeadDialogOpen(false);
+    setLeadCreated(false);
     const geocoder = new google.maps.Geocoder();
     geocoder.geocode({ address: locationText }, (geocodeResults, geocodeStatus) => {
+      if (revision !== searchRevision.current) return;
       const center = geocodeStatus === "OK" ? geocodeResults?.[0]?.geometry.location : undefined;
       const request: google.maps.places.TextSearchRequest = {
         query: `${queryText.trim()} near ${locationText.trim()}`,
         ...(center ? { location: center, radius: Number(radius) * 1609.344 } : {}),
       };
       places.current?.textSearch(request, (placeResults, status) => {
+        if (revision !== searchRevision.current) return;
         setSearching(false);
         if (status !== google.maps.places.PlacesServiceStatus.OK || !placeResults?.length || !map.current) {
           setResults([]);
@@ -193,7 +209,7 @@ export function GoogleProspecting() {
       <section className="map-canvas google-map-canvas" aria-label={t("prospecting.mapLabel")}>
         <div ref={mapElement} className="google-map-surface" />
         {!ready && !error && <div className="map-loading">{t("prospecting.loadingMap")}</div>}
-        {selectedProspect && <div className="map-detail"><div className="map-detail-heading"><span className="company-mark">{selectedProspect.name.slice(0, 2).toUpperCase()}</span><div><strong>{selectedProspect.name}</strong><span>{selectedProspect.category} • {selectedProspect.location}</span></div></div><div className="score-line"><span>{t("prospecting.commercialFit")}</span><strong>{selectedProspect.score}/100</strong></div><button className="action-button full" onClick={() => setLeadDialogOpen(true)}><Plus size={16} /> {t("prospecting.addAsLead")}</button></div>}
+        {selectedProspect && <div className="map-detail"><div className="map-detail-heading"><span className="company-mark">{selectedProspect.name.slice(0, 2).toUpperCase()}</span><div><strong>{selectedProspect.name}</strong><span>{selectedProspect.category} • {selectedProspect.location}</span></div></div><div className="score-line"><span>{t("prospecting.commercialFit")}</span><strong>{selectedProspect.score}/100</strong></div><button className="action-button full" disabled={!can("lead.create")} onClick={() => setLeadDialogOpen(true)}><Plus size={16} /> {t("prospecting.addAsLead")}</button></div>}
         <div className="map-notice">Google Maps • {t("prospecting.mapInteractive")}</div>
       </section>
     </div>

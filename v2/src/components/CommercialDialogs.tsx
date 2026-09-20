@@ -26,7 +26,7 @@ export function LeadDialog({ preset, onClose, onCreated }: { preset?: Partial<Le
     event.preventDefault();
     const result = workspace.createLead({ companyName, location, ownerName, priority, nextAction, nextActionAt, source: preset?.source ?? "manual" });
     if (!result.ok) {
-      setErrorKey(result.reason === "duplicate" ? "leadDialog.duplicate" : "leadDialog.required");
+      setErrorKey(result.reason === "permission_denied" ? "workspace.denied" : result.reason === "duplicate" ? "leadDialog.duplicate" : "leadDialog.required");
       return;
     }
     onCreated?.(result.lead);
@@ -50,7 +50,7 @@ export function ActivityDialog({ onClose, preset }: { onClose: () => void; prese
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (![subject, companyName, ownerName, dueAt].every((value) => value.trim())) { setError(true); return; }
-    workspace.addActivity({ kind, subject: subject.trim(), companyName, ownerName, dueAt: new Date(dueAt).toISOString() });
+    if (!workspace.addActivity({ kind, subject: subject.trim(), companyName, ownerName, dueAt: new Date(dueAt).toISOString() })) return;
     onClose();
   };
 
@@ -71,7 +71,7 @@ export function OpportunityDialog({ onClose, preset }: { onClose: () => void; pr
     event.preventDefault();
     if (![title, companyName, ownerName, nextAction, expectedCloseAt].every((value) => value.trim())) { setError(true); return; }
     const dollars = Number(amount.replace(/[^0-9.]/g, ""));
-    workspace.addOpportunity({ title: title.trim(), companyName, ownerName, amountCents: Number.isFinite(dollars) && dollars > 0 ? Math.round(dollars * 100) : null, nextAction: nextAction.trim(), expectedCloseAt });
+    if (!workspace.addOpportunity({ title: title.trim(), companyName, ownerName, amountCents: Number.isFinite(dollars) && dollars > 0 ? Math.round(dollars * 100) : null, nextAction: nextAction.trim(), expectedCloseAt })) return;
     onClose();
   };
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal commercial-modal" role="dialog" aria-modal="true" aria-labelledby="opportunity-dialog-title"><header><div><span>{t("opportunityDialog.eyebrow")}</span><h2 id="opportunity-dialog-title">{t("opportunityDialog.title")}</h2><p>{t("opportunityDialog.description")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19} /></button></header><form onSubmit={submit}><div className="dialog-grid"><label className="span-two">{t("opportunityDialog.name")}<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("opportunityDialog.namePlaceholder")} autoFocus /></label><label>{t("leads.company")}<select value={companyName} onChange={(event) => setCompanyName(event.target.value)}>{workspace.leads.map((lead) => <option key={lead.id}>{lead.companyName}</option>)}</select></label><label>{t("leads.owner")}<select value={ownerName} onChange={(event) => setOwnerName(event.target.value)}><option>Dante Frota</option><option>Leonardo Agiani</option><option>Luciano Souza</option></select></label><label>{t("opportunityDialog.amount")}<input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="25000" /></label><label>{t("opportunityDialog.closeDate")}<input type="date" value={expectedCloseAt} onChange={(event) => setExpectedCloseAt(event.target.value)} /></label><label className="span-two">{t("leads.nextAction")}<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} placeholder={t("leadDialog.nextActionPlaceholder")} /></label></div>{error && <div className="governance-feedback error" role="alert">{t("leadDialog.required")}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button"><CircleDollarSign size={16} />{t("opportunityDialog.create")}</button></footer></form></section></div>;

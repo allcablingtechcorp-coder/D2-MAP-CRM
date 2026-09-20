@@ -2,6 +2,8 @@
 
 ## Estado verificado em 20 de setembro de 2026
 
+Atualização após auditoria: a sessão agora observa a associação em tempo real e há logout no workspace. As regras administrativas verificam módulo e negações explícitas de permissões. O domínio comercial permanece local e demonstrativo. Ver `AUDITORIA_SEGURANCA_ARQUITETURA.md` para os impedimentos à operação comercial multiusuário.
+
 A aplicação V2 pública opera no modo Firebase autenticado. A associação protegida do proprietário foi criada e validada, a conta `allcablingtechcorp@gmail.com` está conectada à Firebase CLI e o backend seguro foi implantado no projeto `d2-map-crm`.
 
 O ambiente existente possui:
@@ -67,10 +69,11 @@ Os valores de configuração do aplicativo web identificam os recursos Firebase,
 1. O navegador define persistência local da sessão.
 2. O usuário entra com o provedor Google.
 3. A identidade é normalizada para `uid`, e-mail, nome e foto.
-4. O CRM consulta `organizations/{organizationId}/memberships/{uid}`.
+4. O CRM observa `organizations/{organizationId}/memberships/{uid}` em tempo real e requer confirmação do servidor, sem autorizar por cache.
 5. `resolveSession` libera o workspace apenas quando a associação existe e está ativa.
 6. Módulos, permissões e escopo são calculados a partir da associação validada.
 7. A navegação exibe somente os módulos atribuídos, e o shell identifica o usuário e seu papel real.
+8. Alteração, revogação, exclusão ou falha de leitura da associação reavaliam ou bloqueiam a sessão. O botão de saída encerra a sessão Firebase.
 
 O Firebase Authentication já possui Google como provedor e `allcablingtechcorp-coder.github.io` entre os domínios autorizados.
 
@@ -117,7 +120,7 @@ A política local implementa estes princípios:
 - nenhuma gravação cliente em associações e eventos de auditoria;
 - caminhos desconhecidos e coleções legadas negados pela nova política até que seus contratos sejam migrados explicitamente.
 
-Os testes no Emulator Suite cobrem usuário anônimo, leitura da própria associação, usuário suspenso, proprietário, administrador operacional, vendedor, gravações diretas, convites, auditoria e caminhos desconhecidos. Resultado local: 7 testes aprovados.
+Os testes no Emulator Suite cobrem usuário anônimo, leitura da própria associação, usuário suspenso, proprietário, administrador operacional, vendedor, gravações diretas, convites, auditoria, organização diferente, módulo removido, negações explícitas e caminhos desconhecidos. Resultado local: 10 testes aprovados.
 
 Em 20 de setembro de 2026, a regra temporária anterior, que permitia leitura e gravação até 31 de julho de 2050, foi substituída pela política restritiva descrita acima. A implantação de regras, índices e Function foi concluída pela Firebase CLI.
 
@@ -153,7 +156,7 @@ Em 20 de setembro de 2026, a publicação Firebase foi validada em `https://allc
 - interface administrativa verificada em português, inglês e espanhol;
 - nenhum erro de execução encontrado no console do navegador.
 
-O Google Maps emite avisos de modernização para carregamento assíncrono, `PlacesService` e `google.maps.Marker`. Essas APIs continuam funcionais na publicação atual; a migração para `Place` e `AdvancedMarkerElement` fica registrada para a auditoria técnica.
+O carregamento assíncrono do Google Maps foi corrigido na auditoria. `PlacesService` e `google.maps.Marker` continuam funcionais; a migração para `Place` e `AdvancedMarkerElement` está especificada no relatório de auditoria.
 
 ## Referências oficiais
 

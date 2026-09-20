@@ -1,5 +1,11 @@
 # Status de execução — 20 de setembro de 2026
 
+## Resultado da auditoria
+
+A auditoria de segurança e arquitetura foi concluída nesta etapa. Parecer: **homologação controlada, sem aprovação para operação comercial multiusuário**. As correções e os critérios de conclusão estão em `docs/AUDITORIA_SEGURANCA_ARQUITETURA.md`.
+
+Corrigidos atualização de sessão após revogação, logout, isolamento do armazenamento demonstrativo por conta, negações de permissões no servidor, bloqueios de operações comerciais, validação da configuração de produção e respostas atrasadas do mapa. A integração de App Check, persistência comercial, convites reais, logs de login e recuperação de dados ainda precisa ser implementada.
+
 ## Entrega concluída
 
 - Criada a branch `codex/crm-v2-foundation`.
@@ -60,8 +66,8 @@
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 2.120 módulos transformados |
-| `npm run test` | Aprovado; 11 arquivos e 41 testes |
+| `npm run build` | Aprovado; 2.122 módulos transformados |
+| `npm run test` | Aprovado; 13 arquivos e 49 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Administração inspecionada com proprietário protegido, convite, revisão e auditoria |
@@ -73,8 +79,8 @@
 | Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
 | GitHub Pages | Publicação por workflow aprovada e URL pública validada com HTTP 200 |
 | Dependências de produção | `npm audit --omit=dev` aprovado; zero vulnerabilidades encontradas |
-| Política da Function | 6 testes aprovados |
-| Regras Firestore | 7 testes aprovados no Emulator Suite com JRE 21 |
+| Política da Function | 7 testes aprovados |
+| Regras Firestore | 10 testes aprovados no Emulator Suite com JRE 21 |
 | Build das Functions | TypeScript aprovado para Node.js 22 |
 | Ativação Firebase pública | Workflow aprovado; autenticação Google e workspace autenticado carregados na URL pública |
 | Conta proprietária | Associação ativa; papel, status e escopo protegidos contra edição |
@@ -86,7 +92,7 @@
 
 Os módulos comerciais ainda usam o repositório demonstrativo local para leads, pipeline, atividades e empresas. A autenticação e a governança já usam Firebase em produção; a persistência comercial precisa ser migrada em uma etapa própria, com regras e índices específicos.
 
-O Google Maps registra avisos de modernização para carregamento assíncrono, `PlacesService` e `google.maps.Marker`. Não foram encontrados erros de execução e o mapa permanece funcional. A próxima auditoria deve planejar a migração para `Place` e `AdvancedMarkerElement`.
+O carregamento assíncrono foi corrigido. A migração de `PlacesService` e `google.maps.Marker` para `Place` e `AdvancedMarkerElement` continua pendente, com validação de APIs, map ID, quotas e custos. O mapa interativo é preservado.
 
 O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dependências transitivas do SDK oficial (`firebase-admin` → bibliotecas Google → `uuid`) sem correção disponível na árvore fixada em 19 de setembro de 2026. O cliente V2 continua com zero vulnerabilidades de produção informadas pelo npm.
 
@@ -96,4 +102,4 @@ A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`
 
 ## Próximo marco
 
-Executar a auditoria final de segurança e arquitetura em Astra HIGH. Depois, migrar a persistência dos módulos comerciais para repositórios Firebase, incluindo regras, índices, trilha de auditoria e plano de migração dos dados demonstrativos.
+Executar o bloco 1 do relatório de auditoria em SOL HIGH: persistência comercial Firebase e autorização por organização, equipe e registro. Depois, usuários/auditoria e preparação operacional. Usar Astra HIGH novamente na revisão da versão candidata, conforme critérios do relatório.

@@ -158,10 +158,24 @@ export function hasPermission(membership: Membership, permission: Permission): b
 
 export function canManageMembership(actor: Membership, target: Membership): boolean {
   if (!hasPermission(actor, "membership.manage")) return false;
+  if (!actor.modules.includes("admin")) return false;
   if (target.ownerProtected || target.email.trim().toLowerCase() === PROTECTED_OWNER_EMAIL) return false;
   return actor.role === "owner";
 }
 
 export function canAccessModule(membership: Membership, moduleId: ModuleId): boolean {
-  return membership.status === "active" && membership.modules.includes(moduleId);
+  if (membership.status !== "active" || !membership.modules.includes(moduleId)) return false;
+  if (moduleId === "admin") return ["owner", "operations_admin"].includes(membership.role) && hasPermission(membership, "membership.read") && hasPermission(membership, "audit.read");
+  const required: Partial<Record<ModuleId, Permission>> = { leads: "lead.read", pipeline: "opportunity.read", activities: "activity.read", prospecting: "prospecting.search", companies: "lead.read", reports: "report.read" };
+  return !required[moduleId] || hasPermission(membership, required[moduleId]);
+}
+
+export function canPerformCommercialAction(membership: Membership | null, permission: Permission): boolean {
+  if (!membership) return true; // Explicit standalone demo mode only.
+  const modules: Partial<Record<Permission, ModuleId[]>> = {
+    "lead.create": ["leads", "companies", "prospecting"],
+    "opportunity.update": ["pipeline"], "opportunity.close": ["pipeline"],
+    "activity.create": ["activities"], "report.export": ["reports"],
+  };
+  return hasPermission(membership, permission) && (modules[permission] ?? []).some((module) => canAccessModule(membership, module));
 }
