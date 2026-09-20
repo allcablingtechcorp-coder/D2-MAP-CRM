@@ -29,7 +29,7 @@ Este documento substitui os pareceres anteriores para os pontos reexaminados. A 
 | F15 | Telefones e e-mails dos contatos cadastrados não eram apresentados | Contatos exibem dados e links de telefone/e-mail; empresas apresentam website/telefone |
 | F16 | Mapa apresentava uma pontuação de potencial comercial sem validação de qualificação | Exibe a avaliação original do Google, em escala de 5, ou ausência de avaliação. Prioridade comercial não é inferida dessa nota |
 | F17 | Controles de busca global, notificação, ajuda e menus não tinham implementação | Removidos controles sem ação; a busca e os filtros de leads continuam disponíveis. Não anunciar essas funções como concluídas |
-| F18 | Dependência transitiva `uuid` tinha advisory moderado | Override limitado a `gaxios@6.7.1 → uuid@11.1.1`. Gaxios usa `v4()`, API preservada. Auditoria npm e testes posteriores aprovados |
+| F18 | Dependência transitiva `uuid` tinha advisory moderado | Override de `uuid@11.1.1` no pacote Functions. Gaxios usa `v4()`, API preservada. Lockfile regenerado com npm 10 e instalação limpa verificada. Auditoria npm e testes posteriores aprovados |
 | F19 | Datas impossíveis, como 30 de fevereiro, eram normalizadas silenciosamente | Validação rejeita data cuja conversão não preserva o dia informado |
 
 Também foram preservados: Google Maps interativo, bandeiras SVG BR/US/ES, inglês como padrão para navegador sem preferência, preferência de idioma local, marca D2 e PDF institucional. A imagem da conta Google volta a aparecer na identificação do usuário, como na aplicação anterior. As novas mensagens foram traduzidas para português, inglês e espanhol.
