@@ -1,5 +1,5 @@
 import type { Membership } from "../domain/access";
-import type { AuditEvent } from "../domain/governance";
+import type { AuditEvent, Invitation, InvitationInput, Team } from "../domain/governance";
 
 export interface AuthIdentity {
   uid: string;
@@ -27,6 +27,11 @@ export interface MembershipRepository {
   list(): Promise<Membership[]>;
   listAudit(): Promise<AuditEvent[]>;
   save(membership: Membership, reason: string): Promise<void>;
+  listGovernanceDirectory(): Promise<{ invitations: Invitation[]; teams: Team[] }>;
+  createInvitation(input: InvitationInput & { teamIds: string[] }): Promise<Invitation>;
+  createTeam(name: string): Promise<Team>;
+  acceptInvitation(): Promise<boolean>;
+  recordSessionEvent(event: "signed_in" | "access_denied"): Promise<void>;
 }
 
 export function resolveSession(identity: AuthIdentity | null, membership: Membership | null): SessionState {

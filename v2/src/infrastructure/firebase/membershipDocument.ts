@@ -54,6 +54,9 @@ export function membershipFromDocument(uid: string, value: unknown): Membership 
     throw new Error("Invalid membership field: ownerProtected");
   }
   const permissionOverrides = readPermissionOverrides(value.permissionOverrides);
+  if (value.teamIds !== undefined && (!Array.isArray(value.teamIds) || value.teamIds.some((teamId) => typeof teamId !== "string" || !teamId.trim()))) {
+    throw new Error("Invalid membership field: teamIds");
+  }
   return {
     uid,
     email: requiredString(value, "email").toLowerCase(),
@@ -62,6 +65,7 @@ export function membershipFromDocument(uid: string, value: unknown): Membership 
     status,
     scope,
     modules: [...moduleValues],
+    ...(value.teamIds ? { teamIds: [...new Set(value.teamIds as string[])] } : {}),
     ...(permissionOverrides ? { permissionOverrides } : {}),
     ...(value.ownerProtected !== undefined ? { ownerProtected: value.ownerProtected } : {}),
   };

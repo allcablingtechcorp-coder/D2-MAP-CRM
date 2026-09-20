@@ -12,6 +12,7 @@ export interface FirebaseRuntimeConfig {
   client: FirebaseClientConfig;
   organizationId: string;
   functionsRegion: string;
+  appCheckSiteKey?: string;
 }
 
 export type BackendRuntimeConfig = { mode: "demo" } | FirebaseRuntimeConfig;
@@ -48,6 +49,7 @@ export function resolveBackendRuntimeConfig(environment: Environment): BackendRu
 
   const storageBucket = optionalValue(environment, "VITE_FIREBASE_STORAGE_BUCKET");
   const messagingSenderId = optionalValue(environment, "VITE_FIREBASE_MESSAGING_SENDER_ID");
+  const appCheckSiteKey = optionalValue(environment, "VITE_FIREBASE_APPCHECK_SITE_KEY");
 
   return {
     mode: "firebase",
@@ -61,6 +63,7 @@ export function resolveBackendRuntimeConfig(environment: Environment): BackendRu
     },
     organizationId: optionalValue(environment, "VITE_CRM_ORGANIZATION_ID")!,
     functionsRegion: optionalValue(environment, "VITE_FIREBASE_FUNCTIONS_REGION") ?? "us-central1",
+    ...(appCheckSiteKey ? { appCheckSiteKey } : {}),
   };
 }
 

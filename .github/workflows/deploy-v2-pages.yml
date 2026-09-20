@@ -59,6 +59,7 @@ jobs:
       VITE_FIREBASE_FUNCTIONS_REGION: ${{ vars.FIREBASE_FUNCTIONS_REGION }}
       VITE_CRM_ORGANIZATION_ID: ${{ vars.CRM_ORGANIZATION_ID }}
       VITE_GOOGLE_MAPS_API_KEY: ${{ vars.GOOGLE_MAPS_API_KEY }}
+      VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ vars.FIREBASE_APPCHECK_SITE_KEY }}
     defaults:
       run:
         working-directory: v2

@@ -7,17 +7,17 @@ const manager: Membership = { uid: "manager", email: "manager@example.com", disp
 
 describe("governance policy", () => {
   it("keeps the protected owner immutable, including self changes", () => {
-    const result = reviewMembershipChange(owner, owner, { role: "owner", status: "active", scope: "organization", modules: owner.modules }, "change", [owner]);
+    const result = reviewMembershipChange(owner, owner, { role: "owner", status: "active", scope: "organization", modules: owner.modules, teamIds: [] }, "change", [owner]);
     expect(result).toEqual({ ok: false, reason: "protected_owner" });
   });
 
   it("requires a business reason before changing access", () => {
-    const result = reviewMembershipChange(owner, manager, { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard"] }, "", [owner, manager]);
+    const result = reviewMembershipChange(owner, manager, { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard"], teamIds: [] }, "", [owner, manager]);
     expect(result).toEqual({ ok: false, reason: "reason_required" });
   });
 
   it("produces a review with before and after values", () => {
-    const result = reviewMembershipChange(owner, manager, { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard"] }, "Quarterly access review", [owner, manager]);
+    const result = reviewMembershipChange(owner, manager, { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard"], teamIds: [] }, "Quarterly access review", [owner, manager]);
     expect(result.ok && result.value.after.role).toBe("viewer");
     expect(result.ok && result.value.changedFields).toEqual(["role", "scope", "modules"]);
   });

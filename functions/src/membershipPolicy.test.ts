@@ -33,19 +33,19 @@ describe("saveMembership policy", () => {
       organizationId: "d2-group",
       targetUid: "member_1",
       reason: "  Quarterly review  ",
-      patch: { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard", "dashboard", "reports"] },
+      patch: { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard", "dashboard", "reports"], teamIds: [] },
     })).toEqual({
       organizationId: "d2-group",
       targetUid: "member_1",
       reason: "Quarterly review",
-      patch: { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard", "reports"] },
+      patch: { role: "viewer", status: "active", scope: "assigned_records", modules: ["dashboard", "reports"], teamIds: [] },
     });
   });
 
   it("rejects missing reasons, unknown fields and invalid enums", () => {
-    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "", patch: { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"] } })).toThrow(InputValidationError);
-    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "review", extra: true, patch: { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"] } })).toThrow("unsupported fields");
-    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "review", patch: { role: "root", status: "active", scope: "organization", modules: ["dashboard"] } })).toThrow("patch.role");
+    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "", patch: { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"], teamIds: [] } })).toThrow(InputValidationError);
+    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "review", extra: true, patch: { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"], teamIds: [] } })).toThrow("unsupported fields");
+    expect(() => parseSaveMembershipInput({ organizationId: "d2-group", targetUid: "member", reason: "review", patch: { role: "root", status: "active", scope: "organization", modules: ["dashboard"], teamIds: [] } })).toThrow("patch.role");
   });
 
   it("validates membership documents before authorization", () => {
@@ -61,11 +61,11 @@ describe("saveMembership policy", () => {
 
   it("detects removal of an active owner", () => {
     const owner = { ...member, role: "owner" as const };
-    expect(removesActiveOwner(owner, { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"] })).toBe(true);
-    expect(removesActiveOwner(owner, { role: "owner", status: "active", scope: "organization", modules: ["dashboard"] })).toBe(false);
+    expect(removesActiveOwner(owner, { role: "viewer", status: "active", scope: "organization", modules: ["dashboard"], teamIds: [] })).toBe(true);
+    expect(removesActiveOwner(owner, { role: "owner", status: "active", scope: "organization", modules: ["dashboard"], teamIds: [] })).toBe(false);
   });
 
   it("records only changed governance fields", () => {
-    expect(membershipChanges(member, { role: "viewer", status: "active", scope: "assigned_teams", modules: ["dashboard", "leads"] })).toEqual({ role: { from: "sales_manager", to: "viewer" } });
+    expect(membershipChanges(member, { role: "viewer", status: "active", scope: "assigned_teams", modules: ["dashboard", "leads"], teamIds: [] })).toEqual({ role: { from: "sales_manager", to: "viewer" }, teamIds: { from: undefined, to: [] } });
   });
 });

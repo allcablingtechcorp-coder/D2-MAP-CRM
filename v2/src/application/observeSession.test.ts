@@ -13,7 +13,7 @@ function harness() {
   const closeMembership = vi.fn();
   const closeIdentity = vi.fn();
   const auth: AuthGateway = { observeIdentity: (listener) => { identityListener = listener; return closeIdentity; }, signInWithGoogle: async () => identity, signOut: async () => {} };
-  const repo: MembershipRepository = { observeByUid: (_uid, listener, onError) => { membershipListener = listener; failure = onError; return closeMembership; }, findByUid: async () => null, list: async () => [], listAudit: async () => [], save: async () => {} };
+  const repo: MembershipRepository = { observeByUid: (_uid, listener, onError) => { membershipListener = listener; failure = onError; return closeMembership; }, findByUid: async () => null, list: async () => [], listAudit: async () => [], save: async () => {}, listGovernanceDirectory: async () => ({ invitations: [], teams: [] }), createInvitation: async () => { throw new Error("unused"); }, createTeam: async () => { throw new Error("unused"); }, acceptInvitation: async () => false, recordSessionEvent: async () => {} };
   const state = vi.fn();
   const error = vi.fn();
   const close = observeSession(auth, repo, state, error);

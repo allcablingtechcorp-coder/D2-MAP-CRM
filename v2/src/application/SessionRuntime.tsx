@@ -60,11 +60,17 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [acceptingInvitation, setAcceptingInvitation] = useState(false);
 
   useEffect(() => observeSession(auth, memberships, (state) => {
     setActionError(false);
     setSession(state);
   }, setLookupErrorIdentity), [auth, memberships]);
+
+  useEffect(() => {
+    if (session.status === "authenticated") void memberships.recordSessionEvent("signed_in").catch(() => undefined);
+    if (session.status === "membership_required" || session.status === "access_blocked") void memberships.recordSessionEvent("access_denied").catch(() => undefined);
+  }, [memberships, session.status]);
 
   const signIn = async () => {
     setSigningIn(true);
@@ -87,10 +93,17 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
     }
   };
 
+  const acceptInvitation = async () => {
+    setAcceptingInvitation(true); setActionError(false);
+    try { if (!await memberships.acceptInvitation()) setActionError(true); }
+    catch { setActionError(true); }
+    finally { setAcceptingInvitation(false); }
+  };
+
   if (lookupErrorIdentity) return <SessionScreen state="lookup_error" identity={lookupErrorIdentity} onPrimaryAction={signOut} error={actionError} />;
   if (session.status === "loading") return <SessionScreen state="loading" error={actionError} />;
   if (session.status === "signed_out") return <SessionScreen state="signed_out" onPrimaryAction={signIn} busy={signingIn} error={actionError} />;
-  if (session.status === "membership_required") return <SessionScreen state="membership_required" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
+  if (session.status === "membership_required") return <SessionScreen state="membership_required" identity={session.identity} onPrimaryAction={signOut} onSecondaryAction={acceptInvitation} busy={acceptingInvitation} error={actionError} />;
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 
   return (
@@ -107,11 +120,11 @@ function LanguageSwitcher() {
   return <div className="language-switcher" role="group" aria-label={t("language.label")}>{(["pt", "en", "es"] as Locale[]).map((language) => <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language}><LanguageFlag locale={language} /><span>{language.toUpperCase()}</span></button>)}</div>;
 }
 
-function SessionScreen({ state, identity, onPrimaryAction, busy = false, error = false }: { state: SessionScreenState; identity?: AuthIdentity; onPrimaryAction?: () => void; busy?: boolean; error?: boolean }) {
+function SessionScreen({ state, identity, onPrimaryAction, onSecondaryAction, busy = false, error = false }: { state: SessionScreenState; identity?: AuthIdentity; onPrimaryAction?: () => void; onSecondaryAction?: () => void; busy?: boolean; error?: boolean }) {
   const { t } = useI18n();
   const blocked = state === "membership_required" || state === "access_blocked" || state === "configuration_error" || state === "lookup_error";
   const title = state === "signed_out" ? t("auth.signInTitle") : state === "membership_required" ? t("auth.membershipRequiredTitle") : state === "access_blocked" ? t("auth.accessBlockedTitle") : state === "configuration_error" ? t("auth.configurationErrorTitle") : state === "lookup_error" ? t("auth.lookupErrorTitle") : t("auth.loadingTitle");
   const description = state === "signed_out" ? t("auth.signInDescription") : state === "membership_required" ? t("auth.membershipRequiredDescription") : state === "access_blocked" ? t("auth.accessBlockedDescription") : state === "configuration_error" ? t("auth.configurationErrorDescription") : state === "lookup_error" ? t("auth.lookupErrorDescription") : t("auth.loadingDescription");
 
-  return <main className="session-page"><header><Brand inverse subtitle={t("brand.subtitle")} /><LanguageSwitcher /></header><section className="session-card">{blocked ? <ShieldAlert size={28} /> : <ShieldCheck size={28} />}<span className="eyebrow">{t("auth.eyebrow")}</span><h1>{title}</h1><p>{description}</p>{identity && <div className="session-identity"><strong>{identity.displayName}</strong><span>{identity.email}</span></div>}{error && <div className="session-error" role="alert">{t("auth.operationError")}</div>}{state === "signed_out" && <button className="action-button" onClick={onPrimaryAction} disabled={busy}><LogIn size={17} />{busy ? t("auth.signingIn") : t("auth.signInGoogle")}</button>}{(state === "membership_required" || state === "access_blocked" || state === "lookup_error") && <button className="action-button secondary" onClick={onPrimaryAction}><LogOut size={17} />{t("auth.signOut")}</button>}</section></main>;
+  return <main className="session-page"><header><Brand inverse subtitle={t("brand.subtitle")} /><LanguageSwitcher /></header><section className="session-card">{blocked ? <ShieldAlert size={28} /> : <ShieldCheck size={28} />}<span className="eyebrow">{t("auth.eyebrow")}</span><h1>{title}</h1><p>{description}</p>{identity && <div className="session-identity"><strong>{identity.displayName}</strong><span>{identity.email}</span></div>}{error && <div className="session-error" role="alert">{t("auth.operationError")}</div>}{state === "signed_out" && <button className="action-button" onClick={onPrimaryAction} disabled={busy}><LogIn size={17} />{busy ? t("auth.signingIn") : t("auth.signInGoogle")}</button>}{state === "membership_required" && <button className="action-button" onClick={onSecondaryAction} disabled={busy}><ShieldCheck size={17} />{busy ? t("auth.acceptingInvitation") : t("auth.acceptInvitation")}</button>}{(state === "membership_required" || state === "access_blocked" || state === "lookup_error") && <button className="action-button secondary" onClick={onPrimaryAction}><LogOut size={17} />{t("auth.signOut")}</button>}</section></main>;
 }
