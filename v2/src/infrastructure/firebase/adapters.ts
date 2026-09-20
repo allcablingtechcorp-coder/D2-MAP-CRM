@@ -10,10 +10,11 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, getFirestore, type Firestore } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, type Firestore, type Timestamp } from "firebase/firestore";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
+import type { AuditAction, AuditEvent } from "../../domain/governance";
 import type { FirebaseRuntimeConfig } from "./config";
 import { membershipFromDocument } from "./membershipDocument";
 
@@ -64,6 +65,31 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   async list(): Promise<Membership[]> {
     const snapshot = await getDocs(collection(this.database, "organizations", this.organizationId, "memberships"));
     return snapshot.docs.map((membership) => membershipFromDocument(membership.id, membership.data()));
+  }
+
+  async listAudit(): Promise<AuditEvent[]> {
+    const auditQuery = query(
+      collection(this.database, "organizations", this.organizationId, "auditEvents"),
+      orderBy("occurredAt", "desc"),
+      limit(100),
+    );
+    const snapshot = await getDocs(auditQuery);
+    return snapshot.docs.map((entry) => {
+      const data = entry.data();
+      const occurredAt = data.occurredAt as Timestamp | undefined;
+      return {
+        id: entry.id,
+        organizationId: this.organizationId,
+        action: data.action as AuditAction,
+        actorUid: String(data.actorUid ?? ""),
+        actorEmail: String(data.actorEmail ?? ""),
+        targetType: "membership",
+        targetId: String(data.targetId ?? ""),
+        summary: "admin.auditAccessUpdated",
+        ...(typeof data.reason === "string" ? { reason: data.reason } : {}),
+        occurredAt: occurredAt?.toDate().toISOString() ?? new Date(0).toISOString(),
+      };
+    });
   }
 
   async save(membership: Membership, reason: string): Promise<void> {

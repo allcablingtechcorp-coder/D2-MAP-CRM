@@ -1,4 +1,4 @@
-# Status de execução — 19 de setembro de 2026
+# Status de execução — 20 de setembro de 2026
 
 ## Entrega concluída
 
@@ -46,12 +46,17 @@
 - Implementadas regras Firestore de negação padrão, leitura administrativa controlada e bloqueio de gravações diretas de governança.
 - Adicionados 6 testes de política das Functions e 7 testes de regras no Firestore Emulator.
 - Adicionado job de validação de backend ao workflow do GitHub Pages; a publicação do frontend depende da aprovação desses testes.
+- Migrado o projeto Firebase para Blaze com orçamento de US$ 10.
+- Implantadas em produção a Function `saveMembership`, as regras restritivas do Firestore e os índices.
+- Substituída a representação cartográfica em CSS pelo Google Maps JavaScript API com Places, busca real, marcadores, zoom, Street View, mapa/satélite, tela cheia e planejamento de rota.
+- Adicionadas mensagens de carregamento e erro do mapa em português, inglês e espanhol.
+- Configurado o workflow para receber a chave do Google Maps por variável do repositório, sem gravá-la no código da V2.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 2.119 módulos transformados |
+| `npm run build` | Aprovado; 2.120 módulos transformados |
 | `npm run test` | Aprovado; 11 arquivos e 41 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
@@ -70,7 +75,7 @@
 
 ## Limite técnico identificado
 
-O projeto `d2-map-crm` está no plano Spark. A documentação oficial do Firebase exige o plano Blaze para implantar Cloud Functions. Por isso, a Function e as regras foram preparadas e testadas localmente, mas não foram implantadas em produção.
+A associação protegida do proprietário ainda precisa ser criada antes de ativar `VITE_CRM_BACKEND=firebase` no GitHub Pages. O modo público permanece demonstrativo até essa homologação para evitar bloqueio administrativo.
 
 O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dependências transitivas do SDK oficial (`firebase-admin` → bibliotecas Google → `uuid`) sem correção disponível na árvore fixada em 19 de setembro de 2026. O cliente V2 continua com zero vulnerabilidades de produção informadas pelo npm.
 
@@ -80,4 +85,4 @@ A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`
 
 ## Próximo marco
 
-Para produção real, migrar o projeto para Blaze com controles de orçamento, implantar `saveMembership`, regras e índices, criar a associação protegida do proprietário e homologar autenticação e governança. Depois disso, substituir a persistência demonstrativa por repositórios comerciais e ativar `VITE_CRM_BACKEND=firebase` no build publicado.
+Para produção real, criar a associação protegida do proprietário, homologar autenticação e governança, configurar as variáveis Firebase do workflow e ativar `VITE_CRM_BACKEND=firebase`. Depois disso, substituir a persistência demonstrativa dos módulos comerciais por repositórios Firebase.

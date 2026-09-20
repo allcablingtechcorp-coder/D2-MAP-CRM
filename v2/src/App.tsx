@@ -1,8 +1,8 @@
 import { useMemo, useState, type ButtonHTMLAttributes } from "react";
 import {
   ArrowRight, Building2, CalendarDays, CheckCircle2, ChevronRight, CircleDollarSign, Clock3,
-  Download, Filter, ListFilter, MapPin, MoreHorizontal, Phone, Plus, Route,
-  Search, Sparkles, TrendingUp, UserPlus, UsersRound,
+  Download, Filter, ListFilter, MapPin, MoreHorizontal, Phone, Plus,
+  Search, TrendingUp, UserPlus, UsersRound,
 } from "lucide-react";
 import { AppShell, MetricCard, PageHeader } from "./components/AppShell";
 import { Brand } from "./components/Brand";
@@ -17,6 +17,7 @@ import { leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSe
 import { CommercialDetails } from "./components/CommercialDetails";
 import { activeLeadFilterCount, emptyLeadFilters, filterLeads, type LeadFilters } from "./domain/leadFilters";
 import { useRuntimeSession } from "./application/SessionRuntime";
+import { GoogleProspecting } from "./components/GoogleProspecting";
 
 const stageKeys: Record<OpportunityStage, TranslationKey> = { discovery: "stage.discovery", diagnosis: "stage.diagnosis", proposal: "stage.proposal", negotiation: "stage.negotiation", won: "stage.won", lost: "stage.lost" };
 const qualificationKeys: Record<LeadQualification, TranslationKey> = { new: "qualification.new", contacting: "qualification.contacting", qualified: "qualification.qualified", nurturing: "qualification.nurturing", disqualified: "qualification.disqualified" };
@@ -133,24 +134,7 @@ function Activities() {
   </>;
 }
 
-const mapResults = [
-  { name: "Boca Office Interiors", categoryKey: "prospecting.categoryDesigner" as TranslationKey, location: "Boca Raton, FL", score: 92, x: 46, y: 35 },
-  { name: "Coastal Build Partners", categoryKey: "prospecting.categoryContractor" as TranslationKey, location: "Deerfield Beach, FL", score: 86, x: 57, y: 58 },
-  { name: "Palm Workspace Group", categoryKey: "prospecting.categoryArchitect" as TranslationKey, location: "Pompano Beach, FL", score: 78, x: 38, y: 76 },
-];
-function Prospecting() {
-  const { t } = useI18n();
-  const [selected, setSelected] = useState(0);
-  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
-  const [leadCreated, setLeadCreated] = useState(false);
-  return <><PageHeader eyebrow={t("prospecting.eyebrow")} title={t("prospecting.title")} description={t("prospecting.description")} actions={<ActionButton secondary><Route size={17} /> {t("prospecting.planRoute")}</ActionButton>} />
-    {leadCreated && <div className="workflow-feedback" role="status">{t("prospecting.leadCreated")}</div>}
-    <div className="prospecting-shell"><aside className="prospecting-panel"><div className="prospecting-search"><label>{t("prospecting.searchLabel")}</label><div><Search size={17} /><input key={`search-${t("prospecting.searchValue")}`} defaultValue={t("prospecting.searchValue")} /></div></div><div className="search-grid"><label>{t("prospecting.location")}<input defaultValue="Boca Raton, FL" /></label><label>{t("prospecting.radius")}<select defaultValue="20"><option value="20">{t("prospecting.miles", { count: 20 })}</option><option value="35">{t("prospecting.miles", { count: 35 })}</option></select></label></div><button className="action-button full"><Sparkles size={17} /> {t("prospecting.searchCompanies")}</button><div className="result-summary"><div><strong>{t("prospecting.qualifiedResults", { count: 3 })}</strong><span>{t("prospecting.sorted")}</span></div><button className="icon-button"><Filter size={17} /></button></div><div className="map-result-list">{mapResults.map((result, index) => <button className={`map-result ${selected === index ? "selected" : ""}`} key={result.name} onClick={() => setSelected(index)}><div className="result-score">{result.score}</div><div><strong>{result.name}</strong><span>{t(result.categoryKey)}</span><small><MapPin size={12} /> {result.location}</small></div><ChevronRight size={17} /></button>)}</div></aside>
-      <section className="map-canvas" aria-label={t("prospecting.mapLabel")}><div className="map-grid" /><div className="water-shape" /><span className="map-city city-one">Boca Raton</span><span className="map-city city-two">Deerfield Beach</span><span className="map-city city-three">Pompano Beach</span>{mapResults.map((result, index) => <button key={result.name} className={`map-pin ${selected === index ? "selected" : ""}`} onClick={() => { setSelected(index); setLeadCreated(false); }} style={{ left: `${result.x}%`, top: `${result.y}%` }}><MapPin size={selected === index ? 24 : 19} fill="currentColor" /><span>{index + 1}</span></button>)}<div className="map-detail"><div className="map-detail-heading"><span className="company-mark">{mapResults[selected].name.slice(0, 2).toUpperCase()}</span><div><strong>{mapResults[selected].name}</strong><span>{t(mapResults[selected].categoryKey)} • {mapResults[selected].location}</span></div></div><div className="score-line"><span>{t("prospecting.commercialFit")}</span><strong>{mapResults[selected].score}/100</strong></div><button className="action-button full" onClick={() => setLeadDialogOpen(true)}><Plus size={16} /> {t("prospecting.addAsLead")}</button></div><div className="map-notice">{t("prospecting.mapNotice")}</div></section>
-    </div>
-    {leadDialogOpen && <LeadDialog preset={{ companyName: mapResults[selected].name, location: mapResults[selected].location, ownerName: "Dante Frota", source: "map", priority: mapResults[selected].score >= 90 ? "high" : "medium", nextAction: t("prospecting.firstContact") }} onClose={() => setLeadDialogOpen(false)} onCreated={() => setLeadCreated(true)} />}
-  </>;
-}
+const Prospecting = GoogleProspecting;
 
 function Companies() {
   const { t } = useI18n();
