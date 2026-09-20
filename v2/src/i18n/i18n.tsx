@@ -13,15 +13,21 @@ interface I18nValue {
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
+export const LOCALE_STORAGE_KEY = "d2-crm-locale";
+
+export function resolveStoredLocale(stored: string | null): Locale {
+  return stored === "en" || stored === "es" || stored === "pt" ? stored : "en";
+}
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    const stored = localStorage.getItem("d2-crm-locale");
-    return stored === "en" || stored === "es" || stored === "pt" ? stored : "pt";
+    try { return resolveStoredLocale(localStorage.getItem(LOCALE_STORAGE_KEY)); }
+    catch { return "en"; }
   });
 
   useEffect(() => {
-    localStorage.setItem("d2-crm-locale", locale);
+    try { localStorage.setItem(LOCALE_STORAGE_KEY, locale); }
+    catch { /* The UI still changes even when browser storage is unavailable. */ }
     document.documentElement.lang = localeCode[locale];
   }, [locale]);
 

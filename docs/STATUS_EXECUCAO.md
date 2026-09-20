@@ -4,7 +4,7 @@
 
 A auditoria de segurança e arquitetura foi concluída nesta etapa. Parecer: **homologação controlada, sem aprovação para operação comercial multiusuário**. As correções e os critérios de conclusão estão em `docs/AUDITORIA_SEGURANCA_ARQUITETURA.md`.
 
-Corrigidos atualização de sessão após revogação, logout, isolamento do armazenamento demonstrativo por conta, negações de permissões no servidor, bloqueios de operações comerciais, validação da configuração de produção e respostas atrasadas do mapa. A integração de App Check, persistência comercial, convites reais, logs de login e recuperação de dados ainda precisa ser implementada.
+Corrigidos atualização de sessão após revogação, logout, negações de permissões no servidor, validação da configuração de produção e respostas atrasadas do mapa. A primeira etapa da persistência comercial foi conectada ao Firebase para leads, oportunidades e atividades, com comandos no servidor, escopo por organização/registro/equipe e auditoria. App Check, convites reais, logs de login, empresas/contatos próprios, atribuição administrativa de equipes e recuperação de dados ainda precisam ser implementados.
 
 ## Entrega concluída
 
@@ -61,13 +61,20 @@ Corrigidos atualização de sessão após revogação, logout, isolamento do arm
 - Ativado `VITE_CRM_BACKEND=firebase` no workflow público.
 - Homologados na URL pública o login Google, a resolução da sessão, o acesso administrativo, a proteção da conta proprietária e a leitura da associação no Firebase.
 - Homologados em produção o Google Maps interativo e a interface administrativa nos três idiomas.
+- Implementadas Cloud Functions para carregar o workspace autorizado, criar leads, atividades e oportunidades, avançar o pipeline e concluir atividades.
+- Dados comerciais novos recebem `organizationId`, `ownerUid`, `teamId`, identidade do criador e timestamps do servidor; identidade e propriedade não são aceitas livremente do cliente.
+- Implementada autorização de leitura e mutação no servidor para escopo organizacional, registros atribuídos e equipes atribuídas; escopo personalizado falha fechado.
+- Removida a carga automática de dados demonstrativos no workspace Firebase; contas autenticadas iniciam com dados comerciais reais vazios.
+- Adicionada auditoria comercial para criação e alteração de registros.
+- Alterado o idioma inicial para inglês, mantendo preferência PT/EN/ES persistida no navegador.
+- Substituídos emojis por bandeiras SVG do Brasil, Estados Unidos e Espanha no seletor de idioma.
 
 ## Evidências de validação
 
 | Verificação | Resultado |
 |---|---|
-| `npm run build` | Aprovado; 2.122 módulos transformados |
-| `npm run test` | Aprovado; 13 arquivos e 49 testes |
+| `npm run build` | Aprovado; 2.123 módulos transformados |
+| `npm run test` | Aprovado; 13 arquivos e 50 testes |
 | Console do navegador | Nenhum erro encontrado nos fluxos inspecionados |
 | Desktop | Dashboard, prospecção e administração inspecionados em 1440 × 900 |
 | Mobile | Administração inspecionada com proprietário protegido, convite, revisão e auditoria |
@@ -79,7 +86,7 @@ Corrigidos atualização de sessão após revogação, logout, isolamento do arm
 | Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
 | GitHub Pages | Publicação por workflow aprovada e URL pública validada com HTTP 200 |
 | Dependências de produção | `npm audit --omit=dev` aprovado; zero vulnerabilidades encontradas |
-| Política da Function | 7 testes aprovados |
+| Política das Functions | 14 testes aprovados |
 | Regras Firestore | 10 testes aprovados no Emulator Suite com JRE 21 |
 | Build das Functions | TypeScript aprovado para Node.js 22 |
 | Ativação Firebase pública | Workflow aprovado; autenticação Google e workspace autenticado carregados na URL pública |
@@ -90,7 +97,7 @@ Corrigidos atualização de sessão após revogação, logout, isolamento do arm
 
 ## Limite técnico identificado
 
-Os módulos comerciais ainda usam o repositório demonstrativo local para leads, pipeline, atividades e empresas. A autenticação e a governança já usam Firebase em produção; a persistência comercial precisa ser migrada em uma etapa própria, com regras e índices específicos.
+Leads, oportunidades e atividades já possuem persistência Firebase por comandos autenticados. A base de empresas ainda é derivada dos leads e não existe coleção própria de contatos. Atribuição por equipe está protegida no servidor, mas depende do editor de equipes e dos `teamIds` das associações para ser operável. O modo demonstrativo local continua disponível somente quando o aplicativo é iniciado explicitamente em modo demo.
 
 O carregamento assíncrono foi corrigido. A migração de `PlacesService` e `google.maps.Marker` para `Place` e `AdvancedMarkerElement` continua pendente, com validação de APIs, map ID, quotas e custos. O mapa interativo é preservado.
 
@@ -98,8 +105,8 @@ O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dep
 
 ## Estado da publicação
 
-A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login e governança Firebase ativos. O workspace exige autenticação e associação ativa. Os dados dos módulos comerciais permanecem demonstrativos e persistidos no navegador até a migração do domínio comercial.
+A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login e governança Firebase ativos. Esta atualização adiciona a persistência real de leads, oportunidades e atividades e será considerada ativa após a aprovação do workflow e a implantação das novas Functions.
 
 ## Próximo marco
 
-Executar o bloco 1 do relatório de auditoria em SOL HIGH: persistência comercial Firebase e autorização por organização, equipe e registro. Depois, usuários/auditoria e preparação operacional. Usar Astra HIGH novamente na revisão da versão candidata, conforme critérios do relatório.
+Concluir o bloco 1 em SOL HIGH com entidades próprias de empresas/contatos, editor de equipes, atribuição controlada e testes transacionais das callables. Depois executar convites, auditoria de login e preparação operacional. Usar Astra HIGH novamente na revisão da versão candidata, conforme critérios do relatório.

@@ -6,10 +6,12 @@ import { useI18n, type Locale } from "../i18n/i18n";
 import { currentBackendRuntimeConfig, type FirebaseRuntimeConfig } from "../infrastructure/firebase/config";
 import { type AuthGateway, type AuthIdentity, type MembershipRepository, type SessionState } from "./session";
 import { observeSession } from "./observeSession";
+import { LanguageFlag } from "../components/LanguageFlag";
+import type { CommercialRepository } from "./commercial";
 
 type RuntimeSession =
   | { mode: "demo"; identity: null; membership: null }
-  | { mode: "firebase"; identity: AuthIdentity; membership: Membership; memberships: MembershipRepository; organizationId: string; signOut: () => Promise<void>; actionError: boolean };
+  | { mode: "firebase"; identity: AuthIdentity; membership: Membership; memberships: MembershipRepository; commercial: CommercialRepository; organizationId: string; signOut: () => Promise<void>; actionError: boolean };
 
 const RuntimeSessionContext = createContext<RuntimeSession>({ mode: "demo", identity: null, membership: null });
 
@@ -33,7 +35,7 @@ export function SessionRuntimeProvider({ children }: { children: ReactNode }) {
 }
 
 function FirebaseRuntimeBoundary({ config, children }: { config: FirebaseRuntimeConfig; children: ReactNode }) {
-  const [gateways, setGateways] = useState<{ auth: AuthGateway; memberships: MembershipRepository } | null>(null);
+  const [gateways, setGateways] = useState<{ auth: AuthGateway; memberships: MembershipRepository; commercial: CommercialRepository } | null>(null);
   const [initializationError, setInitializationError] = useState(false);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ function FirebaseRuntimeBoundary({ config, children }: { config: FirebaseRuntime
   return <FirebaseSessionBoundary {...gateways} organizationId={config.organizationId}>{children}</FirebaseSessionBoundary>;
 }
 
-function FirebaseSessionBoundary({ auth, memberships, organizationId, children }: { auth: AuthGateway; memberships: MembershipRepository; organizationId: string; children: ReactNode }) {
+function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId, children }: { auth: AuthGateway; memberships: MembershipRepository; commercial: CommercialRepository; organizationId: string; children: ReactNode }) {
   const [session, setSession] = useState<SessionState>({ status: "loading" });
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
@@ -92,7 +94,7 @@ function FirebaseSessionBoundary({ auth, memberships, organizationId, children }
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 
   return (
-    <RuntimeSessionContext.Provider key={`${organizationId}:${session.identity.uid}`} value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, organizationId, signOut, actionError }}>
+    <RuntimeSessionContext.Provider key={`${organizationId}:${session.identity.uid}`} value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, commercial, organizationId, signOut, actionError }}>
       {children}
     </RuntimeSessionContext.Provider>
   );
@@ -102,7 +104,7 @@ type SessionScreenState = "loading" | "signed_out" | "membership_required" | "ac
 
 function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
-  return <div className="language-switcher" role="group" aria-label={t("language.label")}>{(["pt", "en", "es"] as Locale[]).map((language) => <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language}><span aria-hidden="true">{language === "pt" ? "🇧🇷" : language === "en" ? "🇺🇸" : "🇪🇸"}</span><span>{language.toUpperCase()}</span></button>)}</div>;
+  return <div className="language-switcher" role="group" aria-label={t("language.label")}>{(["pt", "en", "es"] as Locale[]).map((language) => <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language}><LanguageFlag locale={language} /><span>{language.toUpperCase()}</span></button>)}</div>;
 }
 
 function SessionScreen({ state, identity, onPrimaryAction, busy = false, error = false }: { state: SessionScreenState; identity?: AuthIdentity; onPrimaryAction?: () => void; busy?: boolean; error?: boolean }) {

@@ -73,7 +73,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .language-switcher button { height: 28px; padding: 0 7px; display: flex; align-items: center; gap: 4px; border: 0; border-radius: 6px; background: transparent; color: #768397; font-size: 8px; font-weight: 800; }
 .language-switcher button:hover { background: #fff; color: #344258; }
 .language-switcher button.active { background: #fff; color: #2159c4; box-shadow: 0 1px 3px rgb(15 23 42 / 10%); }
-.language-switcher button span:first-child { font-size: 13px; }
+.language-flag { width: 17px; height: 12px; flex: 0 0 auto; border-radius: 2px; box-shadow: 0 0 0 1px rgb(15 23 42 / 10%); }
 .environment-badge { padding: 6px 10px; border: 1px solid #f4dfad; border-radius: 999px; background: #fff9e9; color: #98640e; font-size: 11px; font-weight: 600; }
 .icon-button { width: 34px; height: 34px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #657287; }
 .icon-button:hover { background: #edf1f6; color: #25324a; }

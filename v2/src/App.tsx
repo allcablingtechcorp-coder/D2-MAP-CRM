@@ -11,7 +11,7 @@ import { openStages, type ActivityKind, type Lead, type LeadQualification, type 
 import { useI18n, type TranslationKey } from "./i18n/i18n";
 import { AdminGovernance } from "./components/AdminGovernance";
 import { ActivityDialog, LeadDialog, OpportunityDialog } from "./components/CommercialDialogs";
-import { useCrmWorkspace } from "./application/CrmWorkspace";
+import { useCrmWorkspace } from "./application/CrmWorkspaceLive";
 import { nextOpenStage } from "./domain/workflows";
 import { leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSevenDays } from "./domain/metrics";
 import { CommercialDetails } from "./components/CommercialDetails";
@@ -97,10 +97,10 @@ function Pipeline() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [feedbackKey, setFeedbackKey] = useState<TranslationKey | "">("");
   const columns: OpportunityStage[] = ["discovery", "diagnosis", "proposal", "negotiation"];
-  const advance = (id: string, stage: OpportunityStage) => {
+  const advance = async (id: string, stage: OpportunityStage) => {
     const next = nextOpenStage(stage);
     if (!next) return;
-    const result = advanceOpportunity(id, next);
+    const result = await advanceOpportunity(id, next);
     if (!result || !result.ok) {
       setFeedbackKey(result?.reason === "amount_required" ? "pipeline.amountRequired" : "pipeline.transitionError");
       return;
@@ -193,5 +193,5 @@ export function App() {
     environmentLabel={mode === "firebase" ? t("shell.secureWorkspace") : undefined}
     onSignOut={runtime.mode === "firebase" ? runtime.signOut : undefined}
     sessionError={runtime.mode === "firebase" ? runtime.actionError : false}
-  >{mode === "firebase" && resolvedModule !== "admin" && <div className="workflow-feedback" role="note">{t("workspace.localDemoNotice")}</div>}{Page ? <Page key={resolvedModule} /> : <div className="empty-governance"><strong>{t("auth.noModulesTitle")}</strong><span>{t("auth.noModulesDescription")}</span></div>}</AppShell>;
+  >{mode === "firebase" && resolvedModule !== "admin" && <div className="workflow-feedback" role="note">{t("workspace.liveNotice")}</div>}{Page ? <Page key={resolvedModule} /> : <div className="empty-governance"><strong>{t("auth.noModulesTitle")}</strong><span>{t("auth.noModulesDescription")}</span></div>}</AppShell>;
 }
