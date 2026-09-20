@@ -100,7 +100,7 @@ Além de leads, oportunidades e atividades, empresas e contatos agora têm cole�
 | Administração Firebase | Uma associação real carregada; trilha de auditoria inicial sem eventos |
 | Google Maps em produção | 20 resultados reais, marcadores, zoom e seleção de empresa validados |
 | Idiomas em produção | Administração autenticada validada em PT, EN e ES; bandeiras SVG e persistência de EN após recarga confirmadas |
-| Functions comerciais | Seis callables Node.js 22 ativas em `us-central1` |
+| Functions Firebase | 14 callables Node.js 22 ativas em `us-central1` |
 
 ## Limite técnico identificado
 
@@ -112,7 +112,7 @@ O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dep
 
 ## Estado da publicação
 
-A versão pública anterior permanece ativa em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`. Esta atualização será considerada publicada somente após o workflow do GitHub Pages e a implantação das novas Functions concluírem com sucesso.
+A versão candidata está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`. O workflow `35540591245` concluiu com sucesso; as 14 Functions estão ativas em `us-central1`. Foram confirmados na URL pública: sessão proprietária, empresas vazias reais, formulário de empresa, abas de equipes e convites, registro de login na auditoria e Google Maps com 20 resultados, marcadores, zoom, satélite, tela cheia e Street View.
 
 ## Próximo marco
 
