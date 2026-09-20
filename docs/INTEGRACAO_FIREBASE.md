@@ -1,21 +1,22 @@
 # Integração Firebase — fundação segura
 
-## Estado verificado em 19 de setembro de 2026
+## Estado verificado em 20 de setembro de 2026
 
-A aplicação V2 pública permanece no modo demonstrativo. A conta proprietária `allcablingtechcorp@gmail.com` foi conectada à Firebase CLI e o acesso administrativo ao projeto `d2-map-crm` foi confirmado em modo de leitura.
+A aplicação V2 pública permanece no modo demonstrativo até a criação da associação protegida do proprietário. A conta `allcablingtechcorp@gmail.com` está conectada à Firebase CLI e o backend seguro foi implantado no projeto `d2-map-crm`.
 
 O ambiente existente possui:
 
 - Cloud Firestore Native, banco `(default)`, edição Standard e região multirregional `nam5`;
-- camada gratuita ativa;
+- plano Blaze ativo, com orçamento de US$ 10 configurado no console;
 - aplicativo Web `D2 CRM MAP`;
 - Firebase Authentication com Google habilitado;
 - `allcablingtechcorp-coder.github.io` entre os domínios autorizados;
 - quatro identidades cadastradas no Authentication;
 - coleções legadas `users` e `visitas` no Firestore;
-- plano Spark.
+- Function `saveMembership` implantada em `us-central1` com Node.js 22;
+- regras de segurança e índices implantados em produção.
 
-Nenhuma coleção, documento, regra, índice, provedor ou configuração de produção foi alterado nesta etapa.
+As coleções legadas permanecem preservadas, mas não são expostas pelas novas regras. A ativação pública do login aguarda a associação do proprietário e a homologação da sessão.
 
 ## Componentes implementados
 
@@ -67,7 +68,7 @@ Os valores de configuração do aplicativo web identificam os recursos Firebase,
 6. Módulos, permissões e escopo são calculados a partir da associação validada.
 7. A navegação exibe somente os módulos atribuídos, e o shell identifica o usuário e seu papel real.
 
-Antes da homologação, o Firebase Authentication deve habilitar Google como provedor e incluir `allcablingtechcorp-coder.github.io` entre os domínios autorizados.
+O Firebase Authentication já possui Google como provedor e `allcablingtechcorp-coder.github.io` entre os domínios autorizados.
 
 ## Contrato de associações
 
@@ -102,7 +103,7 @@ A Cloud Function implementada executa, no servidor, as seguintes operações em 
 9. gravar somente os campos administrativos permitidos;
 10. gravar o evento de auditoria com ator, alvo, motivo e diferenças antes/depois.
 
-## Regras preparadas para homologação
+## Regras em produção
 
 A política local implementa estes princípios:
 
@@ -114,13 +115,11 @@ A política local implementa estes princípios:
 
 Os testes no Emulator Suite cobrem usuário anônimo, leitura da própria associação, usuário suspenso, proprietário, administrador operacional, vendedor, gravações diretas, convites, auditoria e caminhos desconhecidos. Resultado local: 7 testes aprovados.
 
-As regras atuais de produção não foram substituídas. O console mostra uma versão publicada em 31 de julho de 2026 baseada no modelo temporário de desenvolvimento, cujo próprio texto informa expiração após 30 dias. A substituição deve ocorrer junto da ativação do novo backend para evitar uma migração parcial.
+Em 20 de setembro de 2026, a regra temporária anterior, que permitia leitura e gravação até 31 de julho de 2050, foi substituída pela política restritiva descrita acima. A implantação de regras, índices e Function foi concluída pela Firebase CLI.
 
-## Bloqueio para implantação das Functions
+## Implantação das Functions
 
-O projeto está no plano Spark. Cloud Functions for Firebase exige o plano Blaze para implantação em produção. A Function pode ser compilada e emulada localmente, mas não pode ser publicada enquanto uma conta de faturamento não estiver vinculada ao projeto.
-
-A mudança para Blaze é uma decisão de faturamento e não foi executada automaticamente. Depois da ativação, devem ser configurados alertas de orçamento e limites de escala antes da primeira implantação.
+O projeto foi migrado para o plano Blaze com orçamento de US$ 10. A Function `saveMembership` foi publicada com limite de três instâncias, 256 MiB de memória e timeout de 30 segundos. A política do Artifact Registry remove imagens de implantação com mais de um dia.
 
 ## Critérios de ativação
 
@@ -129,8 +128,8 @@ A mudança para Blaze é uma decisão de faturamento e não foi executada automa
 3. [Concluído] Provedor Google e domínio do GitHub Pages foram confirmados.
 4. [Concluído localmente] `saveMembership`, auditoria transacional, regras e índices foram implementados.
 5. [Concluído localmente] Regras e políticas passaram nos testes automatizados.
-6. [Pendente] Migrar o projeto para Blaze com orçamento controlado.
-7. [Pendente] Implantar Function, regras e índices.
+6. [Concluído] Migrar o projeto para Blaze com orçamento controlado.
+7. [Concluído] Implantar Function, regras e índices.
 8. [Pendente] Criar e validar a associação protegida do proprietário.
 9. [Pendente] Testar login, bloqueio, módulos, escopos, alteração administrativa e logout em homologação.
 10. [Pendente] Ativar `VITE_CRM_BACKEND=firebase` no build público.

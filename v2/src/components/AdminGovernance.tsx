@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Clock3, History, LockKeyhole, MailPlus, ShieldCheck, UserPlus, UsersRound, X } from "lucide-react";
 import { demoMemberships } from "../data/demo";
 import type { AccessScope, Membership, MembershipStatus, ModuleId, RoleId } from "../domain/access";
@@ -14,6 +14,7 @@ import {
 } from "../domain/governance";
 import { useI18n, type TranslationKey } from "../i18n/i18n";
 import { PageHeader } from "./AppShell";
+import { useRuntimeSession } from "../application/SessionRuntime";
 
 const roleKeys: Record<RoleId, TranslationKey> = { owner: "role.owner", operations_admin: "role.operations_admin", sales_manager: "role.sales_manager", sales_rep: "role.sales_rep", sdr: "role.sdr", viewer: "role.viewer" };
 const scopeKeys: Record<AccessScope, TranslationKey> = { organization: "admin.allOrganization", assigned_teams: "admin.assignedTeams", assigned_records: "admin.assignedRecords", custom: "admin.customScope" };
@@ -47,20 +48,42 @@ function initials(name: string) {
 
 export function AdminGovernance() {
   const { t, formatDateTime } = useI18n();
-  const [memberships, setMemberships] = useState<Membership[]>(demoMemberships);
-  const [selectedUid, setSelectedUid] = useState(demoMemberships[0].uid);
+  const runtime = useRuntimeSession();
+  const initialMembership = runtime.mode === "firebase" ? runtime.membership : demoMemberships[0];
+  const [memberships, setMemberships] = useState<Membership[]>(runtime.mode === "firebase" ? [runtime.membership] : demoMemberships);
+  const [selectedUid, setSelectedUid] = useState(initialMembership.uid);
   const [tab, setTab] = useState<"members" | "invitations" | "audit">("members");
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [audit, setAudit] = useState<AuditEvent[]>(initialAudit);
+  const [audit, setAudit] = useState<AuditEvent[]>(runtime.mode === "firebase" ? [] : initialAudit);
+  const [loading, setLoading] = useState(runtime.mode === "firebase");
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [feedbackKey, setFeedbackKey] = useState<TranslationKey | "">("");
-  const selected = memberships.find((member) => member.uid === selectedUid) ?? memberships[0];
-  const actor = memberships[0];
+  const selected = memberships.find((member) => member.uid === selectedUid) ?? initialMembership;
+  const actor = runtime.mode === "firebase" ? runtime.membership : memberships[0];
   const [draftRole, setDraftRole] = useState<RoleId>(selected.role);
   const [draftStatus, setDraftStatus] = useState<MembershipStatus>(selected.status);
   const [draftScope, setDraftScope] = useState<AccessScope>(selected.scope);
   const [reason, setReason] = useState("");
   const [review, setReview] = useState<MembershipChangeReview | null>(null);
+
+  useEffect(() => {
+    if (runtime.mode !== "firebase") return;
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    Promise.all([runtime.memberships.list(), runtime.memberships.listAudit()])
+      .then(([loadedMemberships, loadedAudit]) => {
+        if (!active) return;
+        setMemberships(loadedMemberships);
+        setAudit(loadedAudit);
+        setSelectedUid((currentUid) => loadedMemberships.some((member) => member.uid === currentUid) ? currentUid : runtime.membership.uid);
+      })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [runtime]);
 
   const selectMember = (member: Membership) => {
     setSelectedUid(member.uid); setDraftRole(member.role); setDraftStatus(member.status); setDraftScope(member.scope);
@@ -73,30 +96,46 @@ export function AdminGovernance() {
     setFeedbackKey(""); setReview(result.value);
   };
 
-  const confirmChange = () => {
+  const confirmChange = async () => {
     if (!review) return;
-    setMemberships((items) => items.map((item) => item.uid === review.after.uid ? review.after : item));
-    setAudit((items) => [buildAuditEvent({
-      id: crypto.randomUUID(), organizationId: "d2-group", action: review.after.status === "suspended" ? "membership.suspended" : review.after.status === "revoked" ? "membership.revoked" : "membership.updated",
-      actorUid: actor.uid, actorEmail: actor.email, targetType: "membership", targetId: review.after.uid,
-      summary: "admin.auditAccessUpdated", reason: review.reason, occurredAt: new Date().toISOString(), changes: membershipChanges(review),
-    }), ...items]);
-    setReview(null); setReason(""); setFeedbackKey("admin.changeApplied");
+    setSaving(true);
+    try {
+      if (runtime.mode === "firebase") {
+        await runtime.memberships.save(review.after, review.reason);
+        const [loadedMemberships, loadedAudit] = await Promise.all([runtime.memberships.list(), runtime.memberships.listAudit()]);
+        setMemberships(loadedMemberships);
+        setAudit(loadedAudit);
+      } else {
+        setMemberships((items) => items.map((item) => item.uid === review.after.uid ? review.after : item));
+        setAudit((items) => [buildAuditEvent({
+          id: crypto.randomUUID(), organizationId: "d2-group", action: review.after.status === "suspended" ? "membership.suspended" : review.after.status === "revoked" ? "membership.revoked" : "membership.updated",
+          actorUid: actor.uid, actorEmail: actor.email, targetType: "membership", targetId: review.after.uid,
+          summary: "admin.auditAccessUpdated", reason: review.reason, occurredAt: new Date().toISOString(), changes: membershipChanges(review),
+        }), ...items]);
+      }
+      setReview(null); setReason(""); setFeedbackKey("admin.changeApplied");
+    } catch {
+      setFeedbackKey("auth.operationError");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pendingInvitations = useMemo(() => invitations.filter((invite) => invite.status === "pending").length, [invitations]);
 
   return <>
-    <PageHeader eyebrow={t("admin.eyebrow")} title={t("admin.title")} description={t("admin.description")} actions={<button className="action-button" onClick={() => setInviteOpen(true)}><UserPlus size={17} /> {t("admin.invite")}</button>} />
+    <PageHeader eyebrow={t("admin.eyebrow")} title={t("admin.title")} description={t("admin.description")} actions={runtime.mode === "demo" ? <button className="action-button" onClick={() => setInviteOpen(true)}><UserPlus size={17} /> {t("admin.invite")}</button> : undefined} />
     <div className="admin-alert"><ShieldCheck size={21} /><div><strong>{t("admin.protectedOwner")}</strong><span>{t("admin.protectedDescription")}</span></div></div>
     <div className="governance-tabs" role="tablist" aria-label={t("admin.governanceAreas")}>
       <button className={tab === "members" ? "active" : ""} onClick={() => setTab("members")}><UsersRound size={16} />{t("admin.membersTab")}<span>{memberships.length}</span></button>
-      <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}><MailPlus size={16} />{t("admin.invitationsTab")}<span>{pendingInvitations}</span></button>
+      {runtime.mode === "demo" && <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}><MailPlus size={16} />{t("admin.invitationsTab")}<span>{pendingInvitations}</span></button>}
       <button className={tab === "audit" ? "active" : ""} onClick={() => setTab("audit")}><History size={16} />{t("admin.auditTab")}<span>{audit.length}</span></button>
     </div>
 
     {tab === "members" && <div className="admin-grid">
-      <Panel title={t("admin.usersAccess")} description={t("admin.demoRecords", { count: memberships.length })}>
+      <Panel title={t("admin.usersAccess")} description={runtime.mode === "firebase" ? t("admin.liveRecords", { count: memberships.length }) : t("admin.demoRecords", { count: memberships.length })}>
+        {loading && <div className="governance-feedback" role="status">{t("auth.loadingDescription")}</div>}
+        {loadError && <div className="governance-feedback error" role="alert">{t("auth.lookupErrorDescription")}</div>}
         <div className="member-list">{memberships.map((member) => <button key={member.uid} onClick={() => selectMember(member)} className={selected.uid === member.uid ? "selected" : ""}><span className="member-avatar">{initials(member.displayName)}</span><div><strong>{member.displayName}</strong><span>{member.email}</span></div><span className={`member-status ${member.status}`}>{t(statusKeys[member.status])}</span><ChevronRight size={16} /></button>)}</div>
       </Panel>
       <Panel title={t("admin.accessSummary")} description={selected.ownerProtected ? t("admin.ownerReadOnly") : t("admin.reviewBeforeSaving")}>
@@ -111,8 +150,8 @@ export function AdminGovernance() {
           {!selected.ownerProtected && <label className="reason-field">{t("admin.changeReason")}<textarea value={reason} onChange={(event) => { setReason(event.target.value); setReview(null); }} placeholder={t("admin.changeReasonPlaceholder")} /></label>}
           {feedbackKey && <div className="governance-feedback" role="status">{t(feedbackKey)}</div>}
           {review && <div className="change-review"><div><ShieldCheck size={18} /><strong>{t("admin.reviewReady")}</strong></div><p>{t("admin.reviewFields", { count: review.changedFields.length })}</p><ul>{review.changedFields.map((field) => <li key={field}><span>{t(`admin.field.${field}` as TranslationKey)}</span><strong>{field === "role" ? t(roleKeys[review.after.role]) : field === "scope" ? t(scopeKeys[review.after.scope]) : field === "status" ? t(statusKeys[review.after.status]) : t("admin.modulesUnchanged")}</strong></li>)}</ul></div>}
-          <div className="access-actions">{review && <button className="action-button secondary" onClick={() => setReview(null)}>{t("common.cancel")}</button>}<button className="action-button" disabled={selected.ownerProtected} onClick={review ? confirmChange : reviewChange}>{review ? <Check size={16} /> : <ShieldCheck size={16} />}{review ? t("admin.confirmChange") : t("admin.review")}</button></div>
-          <small className="prototype-copy">{t("admin.prototype")}</small>
+          <div className="access-actions">{review && <button className="action-button secondary" onClick={() => setReview(null)} disabled={saving}>{t("common.cancel")}</button>}<button className="action-button" disabled={selected.ownerProtected || saving} onClick={review ? confirmChange : reviewChange}>{review ? <Check size={16} /> : <ShieldCheck size={16} />}{review ? t("admin.confirmChange") : t("admin.review")}</button></div>
+          <small className="prototype-copy">{t(runtime.mode === "firebase" ? "admin.firebasePersistence" : "admin.prototype")}</small>
         </div>
       </Panel>
     </div>}
@@ -122,7 +161,7 @@ export function AdminGovernance() {
     </Panel>}
 
     {tab === "audit" && <Panel title={t("admin.auditTitle")} description={t("admin.auditDescription")}>
-      <div className="audit-list">{audit.map((event) => <article key={event.id}><div className="audit-icon"><History size={16} /></div><div><strong>{t(event.summary as TranslationKey)}</strong><span>{event.actorEmail} · {event.targetId}</span>{event.reason && <small>{t("admin.reasonPrefix")}: {event.reason}</small>}</div><time><Clock3 size={13} />{formatDateTime(event.occurredAt)}</time></article>)}</div>
+      <div className="audit-list">{audit.length === 0 ? <div className="empty-governance"><History size={28} /><strong>{t("admin.noAudit")}</strong></div> : audit.map((event) => <article key={event.id}><div className="audit-icon"><History size={16} /></div><div><strong>{t(event.summary as TranslationKey)}</strong><span>{event.actorEmail} · {event.targetId}</span>{event.reason && <small>{t("admin.reasonPrefix")}: {event.reason}</small>}</div><time><Clock3 size={13} />{formatDateTime(event.occurredAt)}</time></article>)}</div>
     </Panel>}
 
     {inviteOpen && <InviteDialog memberships={memberships} invitations={invitations} actor={actor} onClose={() => setInviteOpen(false)} onCreated={(invitation) => {

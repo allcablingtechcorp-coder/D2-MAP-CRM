@@ -8,7 +8,7 @@ import { resolveSession, type AuthGateway, type AuthIdentity, type MembershipRep
 
 type RuntimeSession =
   | { mode: "demo"; identity: null; membership: null }
-  | { mode: "firebase"; identity: AuthIdentity; membership: Membership };
+  | { mode: "firebase"; identity: AuthIdentity; membership: Membership; memberships: MembershipRepository };
 
 const RuntimeSessionContext = createContext<RuntimeSession>({ mode: "demo", identity: null, membership: null });
 
@@ -111,7 +111,7 @@ function FirebaseSessionBoundary({ auth, memberships, children }: { auth: AuthGa
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 
   return (
-    <RuntimeSessionContext.Provider value={{ mode: "firebase", identity: session.identity, membership: session.membership }}>
+    <RuntimeSessionContext.Provider value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships }}>
       {children}
     </RuntimeSessionContext.Provider>
   );

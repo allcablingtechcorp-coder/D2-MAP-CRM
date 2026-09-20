@@ -1,4 +1,5 @@
 import type { Membership } from "../domain/access";
+import type { AuditEvent } from "../domain/governance";
 
 export interface AuthIdentity {
   uid: string;
@@ -23,6 +24,7 @@ export interface AuthGateway {
 export interface MembershipRepository {
   findByUid(uid: string): Promise<Membership | null>;
   list(): Promise<Membership[]>;
+  listAudit(): Promise<AuditEvent[]>;
   save(membership: Membership, reason: string): Promise<void>;
 }
 
