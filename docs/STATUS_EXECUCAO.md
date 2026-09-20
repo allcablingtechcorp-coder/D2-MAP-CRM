@@ -51,6 +51,10 @@
 - Substituída a representação cartográfica em CSS pelo Google Maps JavaScript API com Places, busca real, marcadores, zoom, Street View, mapa/satélite, tela cheia e planejamento de rota.
 - Adicionadas mensagens de carregamento e erro do mapa em português, inglês e espanhol.
 - Configurado o workflow para receber a chave do Google Maps por variável do repositório, sem gravá-la no código da V2.
+- Criada no Firestore a associação protegida do proprietário com papel `owner`, status ativo, escopo organizacional e acesso aos oito módulos.
+- Ativado `VITE_CRM_BACKEND=firebase` no workflow público.
+- Homologados na URL pública o login Google, a resolução da sessão, o acesso administrativo, a proteção da conta proprietária e a leitura da associação no Firebase.
+- Homologados em produção o Google Maps interativo e a interface administrativa nos três idiomas.
 
 ## Evidências de validação
 
@@ -72,17 +76,24 @@
 | Política da Function | 6 testes aprovados |
 | Regras Firestore | 7 testes aprovados no Emulator Suite com JRE 21 |
 | Build das Functions | TypeScript aprovado para Node.js 22 |
+| Ativação Firebase pública | Workflow aprovado; autenticação Google e workspace autenticado carregados na URL pública |
+| Conta proprietária | Associação ativa; papel, status e escopo protegidos contra edição |
+| Administração Firebase | Uma associação real carregada; trilha de auditoria inicial sem eventos |
+| Google Maps em produção | 20 resultados reais, marcadores, zoom e seleção de empresa validados |
+| Idiomas em produção | Administração autenticada validada em PT, EN e ES |
 
 ## Limite técnico identificado
 
-A associação protegida do proprietário ainda precisa ser criada antes de ativar `VITE_CRM_BACKEND=firebase` no GitHub Pages. O modo público permanece demonstrativo até essa homologação para evitar bloqueio administrativo.
+Os módulos comerciais ainda usam o repositório demonstrativo local para leads, pipeline, atividades e empresas. A autenticação e a governança já usam Firebase em produção; a persistência comercial precisa ser migrada em uma etapa própria, com regras e índices específicos.
+
+O Google Maps registra avisos de modernização para carregamento assíncrono, `PlacesService` e `google.maps.Marker`. Não foram encontrados erros de execução e o mapa permanece funcional. A próxima auditoria deve planejar a migração para `Place` e `AdvancedMarkerElement`.
 
 O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dependências transitivas do SDK oficial (`firebase-admin` → bibliotecas Google → `uuid`) sem correção disponível na árvore fixada em 19 de setembro de 2026. O cliente V2 continua com zero vulnerabilidades de produção informadas pelo npm.
 
 ## Estado da publicação
 
-A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` e continua usando dados demonstrativos persistidos no navegador. A fundação Firebase desta branch não modifica o comportamento público enquanto `VITE_CRM_BACKEND` permanecer como `demo`.
+A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login e governança Firebase ativos. O workspace exige autenticação e associação ativa. Os dados dos módulos comerciais permanecem demonstrativos e persistidos no navegador até a migração do domínio comercial.
 
 ## Próximo marco
 
-Para produção real, criar a associação protegida do proprietário, homologar autenticação e governança, configurar as variáveis Firebase do workflow e ativar `VITE_CRM_BACKEND=firebase`. Depois disso, substituir a persistência demonstrativa dos módulos comerciais por repositórios Firebase.
+Executar a auditoria final de segurança e arquitetura em Astra HIGH. Depois, migrar a persistência dos módulos comerciais para repositórios Firebase, incluindo regras, índices, trilha de auditoria e plano de migração dos dados demonstrativos.

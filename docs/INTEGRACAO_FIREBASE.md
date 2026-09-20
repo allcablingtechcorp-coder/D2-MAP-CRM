@@ -2,7 +2,7 @@
 
 ## Estado verificado em 20 de setembro de 2026
 
-A aplicação V2 pública permanece no modo demonstrativo até a criação da associação protegida do proprietário. A conta `allcablingtechcorp@gmail.com` está conectada à Firebase CLI e o backend seguro foi implantado no projeto `d2-map-crm`.
+A aplicação V2 pública opera no modo Firebase autenticado. A associação protegida do proprietário foi criada e validada, a conta `allcablingtechcorp@gmail.com` está conectada à Firebase CLI e o backend seguro foi implantado no projeto `d2-map-crm`.
 
 O ambiente existente possui:
 
@@ -14,9 +14,11 @@ O ambiente existente possui:
 - quatro identidades cadastradas no Authentication;
 - coleções legadas `users` e `visitas` no Firestore;
 - Function `saveMembership` implantada em `us-central1` com Node.js 22;
-- regras de segurança e índices implantados em produção.
+- regras de segurança e índices implantados em produção;
+- associação ativa do proprietário em `organizations/d2-group/memberships/{uid}`, com papel proprietário, escopo organizacional, oito módulos e proteção contra alteração;
+- build público configurado com `VITE_CRM_BACKEND=firebase`.
 
-As coleções legadas permanecem preservadas, mas não são expostas pelas novas regras. A ativação pública do login aguarda a associação do proprietário e a homologação da sessão.
+As coleções legadas permanecem preservadas, mas não são expostas pelas novas regras. O login Google, a resolução da sessão, a navegação autorizada, a conta protegida e o painel administrativo foram homologados na URL pública.
 
 ## Componentes implementados
 
@@ -36,7 +38,7 @@ O SDK modular Firebase `12.19.0` foi fixado no `package.json`. A documentação 
 
 ## Configuração de execução
 
-O modo padrão é:
+O modo local padrão é:
 
 ```text
 VITE_CRM_BACKEND=demo
@@ -55,6 +57,8 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=<opcional>
 VITE_FIREBASE_FUNCTIONS_REGION=<região confirmada>
 VITE_CRM_ORGANIZATION_ID=d2-group
 ```
+
+O workflow de produção usa essa configuração com `VITE_CRM_BACKEND=firebase`. As variáveis públicas do aplicativo web e do Google Maps estão armazenadas como variáveis do repositório e são injetadas durante o build.
 
 Os valores de configuração do aplicativo web identificam os recursos Firebase, mas a proteção dos dados depende das regras do Firestore, da autenticação, do App Check quando aplicável e da autorização repetida no backend. Segredos administrativos e chaves de conta de serviço nunca devem usar variáveis `VITE_*`, pois essas variáveis são incorporadas ao JavaScript entregue ao navegador.
 
@@ -130,9 +134,26 @@ O projeto foi migrado para o plano Blaze com orçamento de US$ 10. A Function `s
 5. [Concluído localmente] Regras e políticas passaram nos testes automatizados.
 6. [Concluído] Migrar o projeto para Blaze com orçamento controlado.
 7. [Concluído] Implantar Function, regras e índices.
-8. [Pendente] Criar e validar a associação protegida do proprietário.
-9. [Pendente] Testar login, bloqueio, módulos, escopos, alteração administrativa e logout em homologação.
-10. [Pendente] Ativar `VITE_CRM_BACKEND=firebase` no build público.
+8. [Concluído] Criar e validar a associação protegida do proprietário.
+9. [Concluído] Homologar login, módulos, escopo organizacional, proteção do proprietário, administração, auditoria vazia inicial e idiomas PT/EN/ES na URL pública.
+10. [Concluído] Ativar `VITE_CRM_BACKEND=firebase` no build público.
+
+## Homologação pública
+
+Em 20 de setembro de 2026, a publicação Firebase foi validada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`:
+
+- login Google concluído com a conta corporativa;
+- sessão resolvida como `Super Admin / Proprietário`;
+- ambiente identificado como autenticado;
+- oito módulos liberados conforme a associação;
+- administração carregou uma associação ativa diretamente do Firebase;
+- papel, status e escopo do proprietário permaneceram desabilitados para edição;
+- auditoria carregou sem eventos, estado esperado antes da primeira alteração administrativa;
+- Google Maps carregou 20 resultados reais, marcadores, zoom, seleção, controles de mapa/satélite, Street View e tela cheia;
+- interface administrativa verificada em português, inglês e espanhol;
+- nenhum erro de execução encontrado no console do navegador.
+
+O Google Maps emite avisos de modernização para carregamento assíncrono, `PlacesService` e `google.maps.Marker`. Essas APIs continuam funcionais na publicação atual; a migração para `Place` e `AdvancedMarkerElement` fica registrada para a auditoria técnica.
 
 ## Referências oficiais
 
