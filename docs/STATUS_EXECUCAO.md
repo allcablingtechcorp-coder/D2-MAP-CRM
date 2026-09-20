@@ -1,6 +1,8 @@
-# Estado atual — versão candidata auditada
+# Estado atual — correções auditadas e publicadas
 
 **Referência vigente: [Auditoria de 20/09/2026](AUDITORIA_FINAL_2026-09-20.md).** A auditoria encontrou defeitos na versão anteriormente publicada e corrigiu as transações de permissões, convites, logs, isolamento de módulos e métricas. A publicação permite homologação dos fluxos existentes; a conclusão comercial integral continua condicionada às pendências descritas nesse documento.
+
+Publicação confirmada: PR #10 incorporado, GitHub Pages com sucesso e 14 Functions atualizadas. Verificação online: conta proprietária, evento de sessão, mapa real com busca e zoom, relatórios em PT/EN/ES e preferência de idioma após recarga. Detalhes e limites constam no relatório vigente.
 
 Abaixo está o histórico das entregas; números de testes, pareceres e recomendações anteriores não substituem o relatório vigente.
 

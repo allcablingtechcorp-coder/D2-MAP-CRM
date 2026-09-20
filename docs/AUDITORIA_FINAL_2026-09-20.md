@@ -2,7 +2,7 @@
 
 ## Parecer e alcance
 
-Base: `main` em `c5f1689`. Correções na branch `codex/final-audit`.
+Base examinada: `main` em `c5f1689`. Correções incorporadas pelo PR #10, commit publicado `0db1d3889fc49c526eb0bdad78a60e509581a4ea`.
 
 **A versão anterior não estava integralmente finalizada.** Esta auditoria encontrou e reproduziu falhas em transações de permissões, validação de convites, registros de acesso, separação de módulos e apresentação de métricas. As correções abaixo tornam a versão candidata adequada à homologação controlada dos fluxos disponíveis. Não equivalem à aprovação de todo o escopo de um CRM completo para operação definitiva.
 
@@ -44,13 +44,13 @@ Também foram preservados: Google Maps interativo, bandeiras SVG BR/US/ES, ingl�
 | Regras Firestore | 10 testes aprovados no emulador |
 | Compilação | Frontend e Functions aprovados |
 | Dependências de produção | Frontend e Functions: zero vulnerabilidades reportadas pelo npm nesta execução |
-| PDF de exemplo | Gerado pelo script `generate:report-sample`; valores e presença de imagem verificados por teste |
+| PDF de exemplo | Gerado pelo script `generate:report-sample`; valores e presença de imagem verificados por teste; página renderizada e inspecionada, sem sobreposição ou corte observado |
 
 Os testes integrados cobrem alteração de associação legada, convite não verificado, e-mail diferente, revogação, renovação e concorrência de convites, logs adulterados pelo cliente, organização inexistente, módulos, suspensão, leitura e escrita entre equipes, isolamento de organizações, proteção do proprietário, tentativa de autopromoção, identidade enviada pelo cliente, empresas/contatos persistentes, atividades idempotentes, pipeline até ganho, transição inválida, data impossível e limite de carregamento.
 
 Os sete primeiros cenários falharam contra a versão anterior e passaram após a correção. A suite adicional amplia a cobertura; os números de testes não representam uma garantia de ausência de defeitos.
 
-A execução local utiliza Node 24. O backend de produção e a integração contínua utilizam Node 22. A publicação exige aprovação do workflow nesse runtime. O aviso de tamanho do chunk Firebase permanece; não impede a compilação.
+A execução local utiliza Node 24. O backend de produção e a integração contínua utilizam Node 22. O workflow do PR aprovou build e testes de backend nesse runtime. Total das quatro suítes: 91 testes aprovados. O aviso de tamanho do chunk Firebase permanece; não impede a compilação.
 
 ## Verificação visual local
 
@@ -92,9 +92,22 @@ Critério de encerramento: registrar os resultados desse roteiro sem conceder pa
 
 URL de homologação: https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/
 
-O usuário pode testar os fluxos existentes online após a publicação das correções. **Não interpretar a publicação como conclusão das quatro pendências acima ou autorização técnica para substituir integralmente um CRM operacional.**
+As correções estão publicadas e o usuário pode testar os fluxos existentes online. **Não interpretar a publicação como conclusão das quatro pendências acima ou aprovação técnica para substituir integralmente um CRM operacional.**
 
-Evidência de publicação será registrada no encerramento desta rodada, após confirmação das Functions e do GitHub Pages.
+Evidências confirmadas em 20/09/2026:
+
+- [PR #10](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/pull/10) incorporado à `main`.
+- [Validação do PR](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/actions/runs/35545612481): build e backend aprovados.
+- [Publicação do GitHub Pages](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/actions/runs/35545692181): concluída com sucesso para o commit `0db1d38`.
+- Firebase CLI confirmou atualização bem-sucedida das 14 Functions em `us-central1` e `Deploy complete` no projeto `d2-map-crm`.
+- A primeira tentativa de atualizar Functions falhou na instalação de dependências. O override e o lockfile foram corrigidos; a instalação limpa com npm 10, a integração contínua e a publicação subsequente passaram. O manifesto temporário de descoberta foi removido após o deploy.
+- Versão pública recarregada no Chrome com a conta proprietária: associação reconhecida, dados comerciais carregados, controles da conta protegidos e evento de sessão visível na auditoria.
+- Google Maps real exibiu 20 resultados na busca inicial em Boca Raton; clicar em zoom alterou o nível de 12 para 13. Controles de satélite e Street View estavam presentes; não foi feito ensaio completo desses dois modos nesta rodada.
+- Relatórios públicos conferidos em PT, EN e ES. A base comercial consultada estava vazia: pipeline zero, taxa de ganho indisponível e ausência de responsáveis fictícios. Nenhum dado comercial foi criado nesse teste de produção.
+- Preferência PT preservada após recarga, restaurando o idioma que estava selecionado antes da inspeção. O padrão EN para navegador sem preferência está coberto pelos testes de idioma.
+- Nenhuma entrada de erro foi retornada pelo console capturado do navegador durante a verificação final. Isso não comprova ausência de falhas em fluxos não exercitados.
+
+A prova visual do PDF utilizou o arquivo demonstrativo local; não foi um relatório com dados comerciais de produção. A validação de usuários vendedor/gestor/leitor e os quatro blocos de conclusão continuam pendentes.
 
 ## Execução e custo de modelo
 
