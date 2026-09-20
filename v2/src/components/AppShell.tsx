@@ -2,15 +2,11 @@ import type { ComponentType, ReactNode } from "react";
 import {
   Activity,
   BarChart3,
-  Bell,
   Building2,
-  ChevronDown,
-  CircleHelp,
   LayoutDashboard,
   LogOut,
   MapPinned,
   Menu,
-  Search,
   Settings2,
   Target,
   UsersRound,
@@ -43,7 +39,7 @@ interface AppShellProps {
   mobileNavigationOpen: boolean;
   onToggleNavigation: () => void;
   availableModules?: readonly ModuleId[];
-  account?: { displayName: string; detail: string };
+  account?: { displayName: string; detail: string; photoUrl?: string };
   environmentLabel?: string;
   onSignOut?: () => Promise<void>;
   sessionError?: boolean;
@@ -103,17 +99,12 @@ export function AppShell({
             <Settings2 size={18} strokeWidth={1.9} />
             <span>{t("nav.admin")}</span>
           </button>}
-          <button className="nav-item">
-            <CircleHelp size={18} strokeWidth={1.9} />
-            <span>{t("nav.help")}</span>
-          </button>
           <div className="account-card">
-            <div className="avatar">{initials(account?.displayName ?? "All Cabling Tech")}</div>
+            <div className="avatar">{account?.photoUrl ? <img src={account.photoUrl} alt={account.displayName} referrerPolicy="no-referrer" /> : initials(account?.displayName ?? "All Cabling Tech")}</div>
             <div className="account-copy">
               <strong>{account?.displayName ?? "All Cabling Tech"}</strong>
               <span>{account?.detail ?? t("shell.superAdmin")}</span>
             </div>
-            <ChevronDown size={16} aria-hidden="true" />
           </div>
           {onSignOut && <button className="nav-item" onClick={() => { void onSignOut(); }}><LogOut size={18} /><span>{t("auth.signOut")}</span></button>}
           {sessionError && <p role="alert">{t("auth.operationError")}</p>}
@@ -127,12 +118,7 @@ export function AppShell({
           <button className="icon-button menu-button" onClick={onToggleNavigation} aria-label={t("shell.openNavigation")}>
             <Menu size={21} />
           </button>
-          <label className="global-search">
-            <Search size={18} aria-hidden="true" />
-            <span className="sr-only">{t("shell.globalSearch")}</span>
-            <input placeholder={t("shell.searchPlaceholder")} />
-            <kbd>⌘ K</kbd>
-          </label>
+          <strong className="topbar-title">{t(`nav.${activeModule}` as TranslationKey)}</strong>
           <div className="topbar-actions">
             <div className="language-switcher" role="group" aria-label={t("language.label")}>
               {(["pt", "en", "es"] as Locale[]).map((language) => (
@@ -143,10 +129,7 @@ export function AppShell({
               ))}
             </div>
             <span className="environment-badge">{environmentLabel ?? t("shell.prototype")}</span>
-            <button className="icon-button notification-button" aria-label={t("shell.notifications")}>
-              <Bell size={19} />
-              <span className="notification-dot" />
-            </button>
+
           </div>
         </header>
         <main className="page-content">{children}</main>

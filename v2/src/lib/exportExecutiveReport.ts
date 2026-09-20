@@ -1,3 +1,5 @@
+import { closedDealWinRate, openPipelineValue } from "../domain/metrics.ts";
+import { openStages } from "../domain/crm.ts";
 import { jsPDF } from "jspdf";
 import type { Activity, Lead, Opportunity, OpportunityStage } from "../domain/crm.ts";
 import { localeCode, translate, type Locale, type TranslationKey } from "../i18n/translations.ts";
@@ -70,10 +72,11 @@ function metric(doc: jsPDF, x: number, y: number, width: number, label: string, 
   doc.text(detail, x + 5, y + 22);
 }
 
-export function createExecutiveReportDocument({ activities, generatedBy, leads, opportunities, locale = "pt" }: ExecutiveReportInput, logo: string) {
+export function createExecutiveReportDocument({ activities, generatedBy, leads, opportunities, locale = "en" }: ExecutiveReportInput, logo: string) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const generatedAt = new Intl.DateTimeFormat(localeCode[locale], { dateStyle: "long", timeStyle: "short" }).format(new Date());
-  const pipelineValue = opportunities.reduce((sum, item) => sum + (item.amountCents ?? 0), 0);
+  const pipelineValue = openPipelineValue(opportunities);
+  const winRate = closedDealWinRate(opportunities);
   const mapLeads = leads.filter((lead) => lead.source === "map").length;
   const formatMoney = (amountCents: number | null) => amountCents === null ? translate(locale, "common.notInformed") : new Intl.NumberFormat(localeCode[locale], { style: "currency", currency: "USD" }).format(amountCents / 100);
   const stageKey = (stage: OpportunityStage) => `stage.${stage}` as TranslationKey;
@@ -84,10 +87,10 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
   doc.text(translate(locale, "report.generatedAt", { date: generatedAt }), 14, 45);
   doc.text(translate(locale, "report.responsible", { name: generatedBy }), 196, 45, { align: "right" });
 
-  metric(doc, 14, 52, 42, translate(locale, "dashboard.openPipeline").toUpperCase(), formatMoney(pipelineValue), translate(locale, "dashboard.activeOpportunities", { count: opportunities.length }));
+  metric(doc, 14, 52, 42, translate(locale, "dashboard.openPipeline").toUpperCase(), formatMoney(pipelineValue), translate(locale, "dashboard.activeOpportunities", { count: opportunities.filter((item) => openStages.includes(item.stage)).length }));
   metric(doc, 60, 52, 42, translate(locale, "dashboard.activeLeads").toUpperCase(), String(leads.length), translate(locale, "dashboard.mapOrigin", { count: mapLeads }));
-  metric(doc, 106, 52, 42, translate(locale, "report.activities"), String(activities.length), translate(locale, "report.nextActions"));
-  metric(doc, 152, 52, 44, translate(locale, "report.conversion"), "28%", translate(locale, "common.demoIndicator"));
+  metric(doc, 106, 52, 42, translate(locale, "report.activities"), String(activities.length), translate(locale, "audit.allAuthorizedRecords"));
+  metric(doc, 152, 52, 44, translate(locale, "audit.winRate"), winRate === null ? "—" : `${winRate}%`, translate(locale, winRate === null ? "audit.noClosedDeals" : "audit.winRateDefinition"));
 
   doc.setTextColor(...navy);
   doc.setFont("helvetica", "bold");
@@ -102,7 +105,7 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
   stages.forEach((stage, index) => {
     const y = 105 + index * 15;
     const value = opportunities.filter((item) => item.stage === stage).reduce((sum, item) => sum + (item.amountCents ?? 0), 0);
-    const width = pipelineValue ? Math.max(8, (value / pipelineValue) * 87) : 8;
+    const width = pipelineValue ? (value / pipelineValue) * 87 : 0;
     doc.setTextColor(...navy);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
@@ -113,7 +116,7 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
     doc.setFillColor(237, 241, 246);
     doc.roundedRect(69, y - 4, 87, 4, 2, 2, "F");
     doc.setFillColor(...blue);
-    doc.roundedRect(69, y - 4, width, 4, 2, 2, "F");
+    if (width > 0) doc.rect(69, y - 4, width, 4, "F");
     doc.setTextColor(...slate);
     const stageCount = opportunities.filter((item) => item.stage === stage).length;
     doc.text(`${stageCount} ${translate(locale, stageCount === 1 ? "common.deal" : "common.deals")}`, 196, y, { align: "right" });
@@ -131,7 +134,7 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
   doc.text(translate(locale, "report.stage"), 112, 186);
   doc.text(translate(locale, "report.owner"), 143, 186);
   doc.text(translate(locale, "report.value"), 192, 186, { align: "right" });
-  opportunities.slice(0, 4).forEach((item, index) => {
+  opportunities.filter((item) => openStages.includes(item.stage)).slice(0, 4).forEach((item, index) => {
     const y = 197 + index * 14;
     if (index % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(14, y - 7, 182, 14, "F"); }
     doc.setTextColor(...navy);

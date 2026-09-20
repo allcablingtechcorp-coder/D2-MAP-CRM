@@ -1,3 +1,5 @@
+> Documento histórico. O parecer vigente e os defeitos reavaliados estão em [AUDITORIA_FINAL_2026-09-20.md](AUDITORIA_FINAL_2026-09-20.md).
+
 # Auditoria de segurança e arquitetura — D2 CRM
 
 Data: 20 de setembro de 2026. Base examinada: commit `694eced`, com correções na branch `codex/security-audit-hardening`.

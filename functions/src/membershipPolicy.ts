@@ -74,7 +74,7 @@ export function parseSaveMembershipInput(value: unknown): SaveMembershipInput {
 
   if (!isOneOf(role, roles)) throw new InputValidationError("patch.role is invalid");
   if (!isOneOf(status, statuses)) throw new InputValidationError("patch.status is invalid");
-  if (!isOneOf(scope, scopes)) throw new InputValidationError("patch.scope is invalid");
+  if (!isOneOf(scope, scopes) || scope === "custom") throw new InputValidationError("patch.scope is invalid");
   if (!Array.isArray(moduleValues) || moduleValues.length === 0 || moduleValues.some((item) => !isOneOf(item, modules))) {
     throw new InputValidationError("patch.modules is invalid");
   }
@@ -147,7 +147,7 @@ export function removesActiveOwner(before: MembershipDocument, patch: Membership
 export function membershipChanges(before: MembershipDocument, patch: MembershipPatch): Record<string, { from: unknown; to: unknown }> {
   const changes: Record<string, { from: unknown; to: unknown }> = {};
   for (const field of ["role", "status", "scope", "modules", "teamIds"] as const) {
-    const from = before[field];
+    const from = field === "teamIds" ? before.teamIds ?? [] : before[field];
     const to = patch[field];
     if (JSON.stringify(from) !== JSON.stringify(to)) changes[field] = { from, to };
   }

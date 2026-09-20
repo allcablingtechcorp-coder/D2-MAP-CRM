@@ -79,10 +79,10 @@ const permissionModules: Record<CommercialPermission, readonly string[]> = {
   "lead.create": ["leads", "companies", "prospecting"],
   "lead.assign": ["leads", "companies"],
   "opportunity.read": ["dashboard", "pipeline", "companies", "reports"],
-  "opportunity.update": ["pipeline", "companies"],
+  "opportunity.update": ["pipeline"],
   "opportunity.close": ["pipeline"],
   "activity.read": ["dashboard", "activities", "companies", "reports"],
-  "activity.create": ["activities", "companies"],
+  "activity.create": ["activities"],
 };
 
 const stages = ["discovery", "diagnosis", "proposal", "negotiation", "won", "lost"] as const;
@@ -123,7 +123,7 @@ function isoDate(value: unknown, name: string): string {
 
 function dateOnly(value: unknown, name: string): string {
   const result = text(value, name, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || !Number.isFinite(Date.parse(`${result}T12:00:00Z`))) throw new InputValidationError(`${name} is invalid`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || !Number.isFinite(Date.parse(`${result}T12:00:00Z`)) || new Date(`${result}T12:00:00Z`).toISOString().slice(0, 10) !== result) throw new InputValidationError(`${name} is invalid`);
   return result;
 }
 
@@ -146,7 +146,7 @@ export function hasCommercialPermission(membership: MembershipDocument, permissi
 }
 
 export function canUseCommercialPermission(membership: MembershipDocument, permission: CommercialPermission): boolean {
-  return hasCommercialPermission(membership, permission)
+  return membership.scope !== "custom" && hasCommercialPermission(membership, permission)
     && permissionModules[permission].some((moduleId) => membership.modules.includes(moduleId as never));
 }
 

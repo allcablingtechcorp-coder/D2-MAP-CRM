@@ -8,9 +8,9 @@ import { PageHeader } from "./AppShell";
 interface MapProspect {
   id: string;
   name: string;
-  category: string;
+  category: TranslationKey;
   location: string;
-  score: number;
+  score: number | null;
   position: google.maps.LatLngLiteral;
 }
 
@@ -46,10 +46,8 @@ function categoryKey(types: string[] | undefined): TranslationKey {
   return "prospecting.categoryBusiness";
 }
 
-function commercialScore(place: google.maps.places.PlaceResult): number {
-  const rating = place.rating ?? 3.5;
-  const reviewSignal = Math.min(14, Math.log10((place.user_ratings_total ?? 0) + 1) * 5);
-  return Math.min(99, Math.round(55 + rating * 6 + reviewSignal));
+function commercialScore(place: google.maps.places.PlaceResult): number | null {
+  return typeof place.rating === "number" ? place.rating : null;
 }
 
 export function GoogleProspecting() {
@@ -155,12 +153,12 @@ export function GoogleProspecting() {
           .map((place) => ({
             id: place.place_id ?? `${place.name}-${place.formatted_address ?? ""}`,
             name: place.name!,
-            category: t(categoryKey(place.types)),
+            category: categoryKey(place.types),
             location: place.formatted_address ?? locationText,
             score: commercialScore(place),
             position: place.geometry!.location!.toJSON(),
           }))
-          .sort((left, right) => right.score - left.score);
+          .sort((left, right) => (right.score ?? -1) - (left.score ?? -1));
         markers.current.forEach((marker) => marker.setMap(null));
         const bounds = new google.maps.LatLngBounds();
         markers.current = prospects.map((prospect, index) => {
@@ -202,17 +200,17 @@ export function GoogleProspecting() {
         <div className="prospecting-search"><label>{t("prospecting.searchLabel")}</label><div><Search size={17} /><input value={queryText} onChange={(event) => setQueryText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && searchPlaces()} /></div></div>
         <div className="search-grid"><label>{t("prospecting.location")}<input value={locationText} onChange={(event) => setLocationText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && searchPlaces()} /></label><label>{t("prospecting.radius")}<select value={radius} onChange={(event) => setRadius(event.target.value)}><option value="20">{t("prospecting.miles", { count: 20 })}</option><option value="35">{t("prospecting.miles", { count: 35 })}</option></select></label></div>
         <button className="action-button full" onClick={searchPlaces} disabled={!ready || searching}><Sparkles size={17} /> {searching ? t("prospecting.searching") : t("prospecting.searchCompanies")}</button>
-        <div className="result-summary"><div><strong>{t("prospecting.qualifiedResults", { count: results.length })}</strong><span>{t("prospecting.sorted")}</span></div></div>
+        <div className="result-summary"><div><strong>{t("audit.mapResults", { count: results.length })}</strong><span>{t("audit.mapSorted")}</span></div></div>
         {error && <div className="map-error" role="alert">{t(`prospecting.error.${error}`)}</div>}
-        <div className="map-result-list">{results.map((result, index) => <button className={`map-result ${selected === index ? "selected" : ""}`} key={result.id} onClick={() => selectProspect(index)}><div className="result-score">{result.score}</div><div><strong>{result.name}</strong><span>{result.category}</span><small><MapPin size={12} /> {result.location}</small></div><ChevronRight size={17} /></button>)}</div>
+        <div className="map-result-list">{results.map((result, index) => <button className={`map-result ${selected === index ? "selected" : ""}`} key={result.id} onClick={() => selectProspect(index)}><div className="result-score">{result.score ?? "—"}</div><div><strong>{result.name}</strong><span>{t(result.category)}</span><small><MapPin size={12} /> {result.location}</small></div><ChevronRight size={17} /></button>)}</div>
       </aside>
       <section className="map-canvas google-map-canvas" aria-label={t("prospecting.mapLabel")}>
         <div ref={mapElement} className="google-map-surface" />
         {!ready && !error && <div className="map-loading">{t("prospecting.loadingMap")}</div>}
-        {selectedProspect && <div className="map-detail"><div className="map-detail-heading"><span className="company-mark">{selectedProspect.name.slice(0, 2).toUpperCase()}</span><div><strong>{selectedProspect.name}</strong><span>{selectedProspect.category} • {selectedProspect.location}</span></div></div><div className="score-line"><span>{t("prospecting.commercialFit")}</span><strong>{selectedProspect.score}/100</strong></div><button className="action-button full" disabled={!can("lead.create")} onClick={() => setLeadDialogOpen(true)}><Plus size={16} /> {t("prospecting.addAsLead")}</button></div>}
+        {selectedProspect && <div className="map-detail"><div className="map-detail-heading"><span className="company-mark">{selectedProspect.name.slice(0, 2).toUpperCase()}</span><div><strong>{selectedProspect.name}</strong><span>{t(selectedProspect.category)} • {selectedProspect.location}</span></div></div><div className="score-line"><span>{t("audit.googleRating")}</span><strong>{selectedProspect.score === null ? "—" : `${selectedProspect.score}/5`}</strong></div><button className="action-button full" disabled={!can("lead.create")} onClick={() => setLeadDialogOpen(true)}><Plus size={16} /> {t("prospecting.addAsLead")}</button></div>}
         <div className="map-notice">Google Maps • {t("prospecting.mapInteractive")}</div>
       </section>
     </div>
-    {leadDialogOpen && selectedProspect && <LeadDialog preset={{ companyName: selectedProspect.name, location: selectedProspect.location, ownerName: "Dante Frota", source: "map", priority: selectedProspect.score >= 90 ? "high" : "medium", nextAction: t("prospecting.firstContact") }} onClose={() => setLeadDialogOpen(false)} onCreated={() => setLeadCreated(true)} />}
+    {leadDialogOpen && selectedProspect && <LeadDialog preset={{ companyName: selectedProspect.name, location: selectedProspect.location, ownerName: "Dante Frota", source: "map", priority: "medium", nextAction: t("prospecting.firstContact") }} onClose={() => setLeadDialogOpen(false)} onCreated={() => setLeadCreated(true)} />}
   </>;
 }

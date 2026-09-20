@@ -153,7 +153,7 @@ export function createInvitation(
   if (actor.role !== "owner" || actor.status !== "active") return { ok: false, reason: "actor_not_authorized" };
   const email = normalizeEmail(input.email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: "invalid_email" };
-  if (memberships.some((member) => normalizeEmail(member.email) === email) || existingInvitations.some((invite) => invite.status === "pending" && normalizeEmail(invite.email) === email)) return { ok: false, reason: "duplicate_email" };
+  if (memberships.some((member) => normalizeEmail(member.email) === email) || existingInvitations.some((invite) => invite.status === "pending" && Date.parse(invite.expiresAt) > now.getTime() && normalizeEmail(invite.email) === email)) return { ok: false, reason: "duplicate_email" };
   if (input.role === "owner") return { ok: false, reason: "owner_invitation_forbidden" };
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   return {

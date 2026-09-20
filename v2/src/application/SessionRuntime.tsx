@@ -60,6 +60,7 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [sessionLogError, setSessionLogError] = useState(false);
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
 
   useEffect(() => observeSession(auth, memberships, (state) => {
@@ -68,9 +69,9 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
   }, setLookupErrorIdentity), [auth, memberships]);
 
   useEffect(() => {
-    if (session.status === "authenticated") void memberships.recordSessionEvent("signed_in").catch(() => undefined);
+    if (session.status === "authenticated") void memberships.recordSessionEvent("signed_in").then(() => setSessionLogError(false)).catch(() => setSessionLogError(true));
     if (session.status === "membership_required" || session.status === "access_blocked") void memberships.recordSessionEvent("access_denied").catch(() => undefined);
-  }, [memberships, session.status]);
+  }, [memberships, session.status, "identity" in session ? session.identity.uid : null]);
 
   const signIn = async () => {
     setSigningIn(true);
@@ -108,10 +109,13 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
 
   return (
     <RuntimeSessionContext.Provider key={`${organizationId}:${session.identity.uid}`} value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, commercial, organizationId, signOut, actionError }}>
+      {sessionLogError && <SessionLogError />}
       {children}
     </RuntimeSessionContext.Provider>
   );
 }
+
+function SessionLogError() { const { t } = useI18n(); return <div className="governance-feedback error" role="alert">{t("audit.sessionLogError")}</div>; }
 
 type SessionScreenState = "loading" | "signed_out" | "membership_required" | "access_blocked" | "configuration_error" | "lookup_error";
 

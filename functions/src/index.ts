@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, Timestamp, getFirestore, type DocumentData, type Query } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore, type DocumentData, type Query, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { createHash } from "node:crypto";
 import {
@@ -115,8 +115,9 @@ export const saveMembership = onCall(callableOptions, async (request) => {
   return { saved: true as const, auditEventId: auditReference.id };
 });
 
-async function commercialActor(organizationId: string, uid: string) {
-  const snapshot = await database.doc(`organizations/${organizationId}/memberships/${uid}`).get();
+async function commercialActor(organizationId: string, uid: string, transaction?: Transaction) {
+  const reference = database.doc(`organizations/${organizationId}/memberships/${uid}`);
+  const snapshot = await (transaction ? transaction.get(reference) : reference.get());
   if (!snapshot.exists) throw new HttpsError("permission-denied", "Active membership is required");
   try { return parseMembershipDocument(snapshot.data()); }
   catch { throw new HttpsError("failed-precondition", "Membership data is invalid"); }
@@ -124,6 +125,11 @@ async function commercialActor(organizationId: string, uid: string) {
 
 function requireCommercialPermission(actor: Awaited<ReturnType<typeof commercialActor>>, permission: CommercialPermission): void {
   if (!canUseCommercialPermission(actor, permission)) throw new HttpsError("permission-denied", "The requested commercial operation is not allowed");
+}
+
+async function revalidateActor(transaction: Transaction, organizationId: string, uid: string, actor: Awaited<ReturnType<typeof commercialActor>>) {
+  const current = await commercialActor(organizationId, uid, transaction);
+  if (current.status !== "active" || JSON.stringify(current) !== JSON.stringify(actor)) throw new HttpsError("permission-denied", "Membership changed; reload before retrying");
 }
 
 function recordAccess(data: DocumentData): { ownerUid: string; teamId: string | null } {
@@ -149,13 +155,13 @@ function auditDocument(organizationId: string, actorUid: string, actorEmail: str
 }
 
 function queryForScope(base: Query, actor: Awaited<ReturnType<typeof commercialActor>>, uid: string): Query[] {
-  if (actor.scope === "organization") return [base.limit(500)];
-  if (actor.scope === "assigned_records") return [base.where("ownerUid", "==", uid).limit(500)];
+  if (actor.scope === "organization") return [base.limit(501)];
+  if (actor.scope === "assigned_records") return [base.where("ownerUid", "==", uid).limit(501)];
   if (actor.scope === "assigned_teams") {
     const teams = actor.teamIds ?? [];
     if (!teams.length) return [];
     const queries: Query[] = [];
-    for (let offset = 0; offset < teams.length; offset += 10) queries.push(base.where("teamId", "in", teams.slice(offset, offset + 10)).limit(500));
+    for (let offset = 0; offset < teams.length; offset += 10) queries.push(base.where("teamId", "in", teams.slice(offset, offset + 10)).limit(501));
     return queries;
   }
   return [];
@@ -164,6 +170,7 @@ function queryForScope(base: Query, actor: Awaited<ReturnType<typeof commercialA
 async function scopedDocuments(organizationId: string, collectionName: string, actor: Awaited<ReturnType<typeof commercialActor>>, uid: string): Promise<Array<{ id: string; data: DocumentData }>> {
   const queries = queryForScope(database.collection(`organizations/${organizationId}/${collectionName}`), actor, uid);
   const snapshots = await Promise.all(queries.map((query) => query.get()));
+  if (snapshots.some((snapshot) => snapshot.size > 500)) throw new HttpsError("resource-exhausted", "Workspace exceeds the current 500-record per-scope limit; narrow the assigned scope before generating reports");
   const documents = new Map<string, { id: string; data: DocumentData }>();
   snapshots.forEach((snapshot) => snapshot.docs.forEach((document) => documents.set(document.id, { id: document.id, data: document.data() })));
   return [...documents.values()];
@@ -210,8 +217,8 @@ export const loadCommercialWorkspace = onCall(callableOptions, async (request) =
     canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "leads", actor, request.auth.uid) : [],
     canUseCommercialPermission(actor, "opportunity.read") ? scopedDocuments(input.organizationId, "opportunities", actor, request.auth.uid) : [],
     canUseCommercialPermission(actor, "activity.read") ? scopedDocuments(input.organizationId, "activities", actor, request.auth.uid) : [],
-    canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "companies", actor, request.auth.uid) : [],
-    canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "contacts", actor, request.auth.uid) : [],
+    actor.modules.includes("companies") && canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "companies", actor, request.auth.uid) : [],
+    actor.modules.includes("companies") && canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "contacts", actor, request.auth.uid) : [],
   ]);
   return {
     leads: leads.map(serializeLead).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt)),
@@ -237,8 +244,10 @@ export const createCommercialLead = onCall(callableOptions, async (request) => {
   const now = Timestamp.now();
   const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), companyName: input.companyName, companyNameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, locationNormalized: input.location.toLocaleLowerCase("en-US"), qualification: "new", source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: Timestamp.fromDate(new Date(input.nextActionAt)), lastActivityAt: now, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
     const [leadSnapshot, companySnapshot] = await Promise.all([transaction.get(reference), transaction.get(companyReference)]);
     if (leadSnapshot.exists) throw new HttpsError("already-exists", "A lead already exists for this company and location");
+    if (companySnapshot.exists) requireRecordAccess(actor, request.auth!.uid, companySnapshot.data()!);
     transaction.create(reference, data);
     if (!companySnapshot.exists) transaction.create(companyReference, { organizationId: input.organizationId, ownerUid: request.auth!.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), name: input.companyName, nameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, industry: "", website: "", phone: "", createdByUid: request.auth!.uid, createdAt: now, updatedByUid: request.auth!.uid, updatedAt: now });
     transaction.create(audit.reference, audit.data);
@@ -252,7 +261,16 @@ function canReadGovernance(actor: Awaited<ReturnType<typeof commercialActor>>): 
 }
 
 function serializeInvitation(id: string, data: DocumentData) {
-  return { id, organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status: String(data.status ?? "pending"), invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
+  const status = data.status === "pending" && !isLiveInvitation(data) ? "expired" : String(data.status ?? "expired");
+  return { id, organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
+}
+
+function isLiveInvitation(data: DocumentData): boolean {
+  return data.status === "pending" && data.expiresAt instanceof Timestamp && data.expiresAt.toMillis() > Date.now();
+}
+
+function invitationLock(organizationId: string, email: string) {
+  return database.doc(`organizations/${organizationId}/invitationLocks/${createHash("sha256").update(email).digest("hex")}`);
 }
 
 export const listGovernanceDirectory = onCall(callableOptions, async (request) => {
@@ -288,6 +306,7 @@ export const createGovernanceTeam = onCall(callableOptions, async (request) => {
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "team.created", "team", id, "Team created");
   const now = Timestamp.now();
   await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
     if ((await transaction.get(reference)).exists) throw new HttpsError("already-exists", "This team already exists");
     transaction.create(reference, { organizationId: input.organizationId, name: input.name, createdByUid: request.auth!.uid, createdAt: now, updatedAt: now });
     transaction.create(audit.reference, audit.data);
@@ -308,14 +327,20 @@ export const createGovernanceInvitation = onCall(callableOptions, async (request
   const now = Timestamp.now();
   const expiresAt = Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000);
   await database.runTransaction(async (transaction) => {
+    const currentActor = await commercialActor(input.organizationId, request.auth!.uid, transaction);
+    if (!canManageMemberships(currentActor)) throw new HttpsError("permission-denied", "Owner access is required");
+    const lock = invitationLock(input.organizationId, input.email);
+    await transaction.get(lock);
     const [membershipMatches, invitationMatches, ...teamSnapshots] = await Promise.all([
       transaction.get(organization.collection("memberships").where("email", "==", input.email).limit(1)),
-      transaction.get(organization.collection("invitations").where("email", "==", input.email).limit(20)),
+      transaction.get(organization.collection("invitations").where("email", "==", input.email)),
       ...input.teamIds.map((teamId) => transaction.get(organization.collection("teams").doc(teamId))),
     ]);
-    if (!membershipMatches.empty || invitationMatches.docs.some((document) => document.data().status === "pending")) throw new HttpsError("already-exists", "This email already has access or a pending invitation");
+    if (!membershipMatches.empty || invitationMatches.docs.some((document) => isLiveInvitation(document.data()))) throw new HttpsError("already-exists", "This email already has access or a pending invitation");
     if (teamSnapshots.some((snapshot) => !snapshot.exists)) throw new HttpsError("failed-precondition", "An assigned team does not exist");
     const data = { organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth!.uid, createdAt: now, expiresAt };
+    for (const document of invitationMatches.docs) if (document.data().status === "pending") transaction.update(document.ref, { status: "expired", updatedAt: now });
+    transaction.set(lock, { invitationId: reference.id, updatedAt: now });
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
   });
   return { invitation: serializeInvitation(reference.id, { organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth.uid, createdAt: now, expiresAt }) };
@@ -327,22 +352,29 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
   try { input = parseOrganizationCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const email = typeof request.auth.token.email === "string" ? request.auth.token.email.trim().toLowerCase() : "";
-  if (!email) throw new HttpsError("failed-precondition", "The Google account has no verified email");
+  if (!email || request.auth.token.email_verified !== true || request.auth.token.firebase?.sign_in_provider !== "google.com") throw new HttpsError("failed-precondition", "A verified Google account is required");
   const organization = database.collection("organizations").doc(input.organizationId);
   const membershipReference = organization.collection("memberships").doc(request.auth.uid);
   let accepted = false;
   await database.runTransaction(async (transaction) => {
-    const invitationQuery = organization.collection("invitations").where("email", "==", email).limit(20);
-    const [membershipSnapshot, invitations] = await Promise.all([transaction.get(membershipReference), transaction.get(invitationQuery)]);
-    if (membershipSnapshot.exists) { accepted = true; return; }
-    const invitation = invitations.docs.find((document) => document.data().status === "pending");
+    const lock = invitationLock(input.organizationId, email);
+    await transaction.get(lock);
+    const invitationQuery = organization.collection("invitations").where("email", "==", email);
+    const [membershipSnapshot, invitations, existingIdentity] = await Promise.all([transaction.get(membershipReference), transaction.get(invitationQuery), transaction.get(organization.collection("memberships").where("email", "==", email).limit(1))]);
+    if (membershipSnapshot.exists) { accepted = membershipSnapshot.data()?.status === "active" && membershipSnapshot.data()?.email === email; return; }
+    if (!existingIdentity.empty) throw new HttpsError("failed-precondition", "This email already belongs to another membership");
+    const invitation = invitations.docs.find((document) => isLiveInvitation(document.data()));
     if (!invitation) return;
     const data = invitation.data();
-    const expiresAt = data.expiresAt as Timestamp | undefined;
-    if (!expiresAt || expiresAt.toMillis() <= Date.now()) { transaction.update(invitation.ref, { status: "expired", updatedAt: FieldValue.serverTimestamp() }); return; }
+    const validated = parseCreateInvitationCommand({ organizationId: input.organizationId, email, role: data.role, scope: data.scope, modules: data.modules, teamIds: data.teamIds ?? [] });
+    const issuer = await commercialActor(input.organizationId, String(data.invitedByUid), transaction);
+    if (!canManageMemberships(issuer)) throw new HttpsError("failed-precondition", "The invitation issuer no longer has authority");
+    const teams = await Promise.all(validated.teamIds.map((teamId) => transaction.get(organization.collection("teams").doc(teamId))));
+    if (teams.some((team) => !team.exists)) throw new HttpsError("failed-precondition", "An assigned team no longer exists");
     const displayName = typeof request.auth!.token.name === "string" && request.auth!.token.name.trim() ? request.auth!.token.name.trim() : email;
     transaction.create(membershipReference, { email, displayName, role: data.role, status: "active", scope: data.scope, modules: data.modules, teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], ownerProtected: false, invitedByUid: data.invitedByUid, invitationId: invitation.id, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     transaction.update(invitation.ref, { status: "accepted", acceptedByUid: request.auth!.uid, acceptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    transaction.set(lock, { invitationId: invitation.id, acceptedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, email, "membership.invitation_accepted", "membership", request.auth!.uid, "Access invitation accepted");
     transaction.create(audit.reference, audit.data); accepted = true;
   });
@@ -355,12 +387,20 @@ export const recordSessionEvent = onCall(callableOptions, async (request) => {
   try { input = parseSessionCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const email = typeof request.auth.token.email === "string" ? request.auth.token.email.trim().toLowerCase() : "unknown";
-  const authenticationTime = typeof request.auth.token.auth_time === "number" ? request.auth.token.auth_time : Math.floor(Date.now() / 1000);
-  const id = createHash("sha256").update(`${request.auth.uid}:${input.event}:${authenticationTime}`).digest("hex").slice(0, 32);
-  const reference = database.doc(`organizations/${input.organizationId}/auditEvents/${id}`);
-  const action = input.event === "signed_in" ? "auth.signed_in" : "auth.access_denied";
-  try { await reference.create({ organizationId: input.organizationId, action, actorUid: request.auth.uid, actorEmail: email, targetType: "session", targetId: String(authenticationTime), summary: input.event === "signed_in" ? "Session authenticated" : "Access denied", occurredAt: FieldValue.serverTimestamp() }); }
-  catch (error) { if ((error as { code?: number | string }).code !== 6 && (error as { code?: number | string }).code !== "already-exists") throw error; }
+  const authenticationTime = request.auth.token.auth_time;
+  if (typeof authenticationTime !== "number" || !Number.isFinite(authenticationTime)) throw new HttpsError("unauthenticated", "Authentication time is required");
+  await database.runTransaction(async (transaction) => {
+    const organization = database.doc(`organizations/${input.organizationId}`);
+    const [organizationSnapshot, membership] = await Promise.all([transaction.get(organization), transaction.get(organization.collection("memberships").doc(request.auth!.uid))]);
+    if (!organizationSnapshot.exists) throw new HttpsError("permission-denied", "Organization is not available");
+    // The browser's event is only a trigger; the server determines the access outcome.
+    const allowed = membership.exists && membership.data()?.status === "active" && membership.data()?.email === email;
+    const event = allowed ? "signed_in" : "access_denied";
+    const id = createHash("sha256").update(`${request.auth!.uid}:${event}:${authenticationTime}`).digest("hex").slice(0, 32);
+    const reference = organization.collection("auditEvents").doc(id);
+    if ((await transaction.get(reference)).exists) return;
+    transaction.create(reference, { organizationId: input.organizationId, action: `auth.${event}`, actorUid: request.auth!.uid, actorEmail: email, targetType: "session", targetId: String(authenticationTime), summary: allowed ? "Session authenticated" : "Access denied", occurredAt: FieldValue.serverTimestamp() });
+  });
   return { recorded: true };
 });
 
@@ -378,6 +418,7 @@ export const createCommercialCompany = onCall(callableOptions, async (request) =
   const now = Timestamp.now();
   const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), name: input.name, nameNormalized: input.name.toLocaleLowerCase("en-US"), location: input.location, industry: input.industry, website: input.website, phone: input.phone, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
     if ((await transaction.get(reference)).exists) throw new HttpsError("already-exists", "This company already exists");
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
   });
@@ -391,6 +432,7 @@ export const createCommercialContact = onCall(callableOptions, async (request) =
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const actor = await commercialActor(input.organizationId, request.auth.uid);
   requireCommercialPermission(actor, "lead.create");
+  if (!actor.modules.includes("companies")) throw new HttpsError("permission-denied", "Companies access is required");
   const companyReference = database.doc(`organizations/${input.organizationId}/companies/${input.companyId}`);
   const companySnapshot = await companyReference.get();
   if (!companySnapshot.exists) throw new HttpsError("not-found", "Company was not found");
@@ -399,7 +441,12 @@ export const createCommercialContact = onCall(callableOptions, async (request) =
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.contact_created", "contact", reference.id, "Contact created");
   const now = Timestamp.now();
   const data = { organizationId: input.organizationId, ownerUid: String(company.ownerUid), ownerName: String(company.ownerName), teamId: typeof company.teamId === "string" ? company.teamId : null, companyId: input.companyId, companyName: String(company.name), name: input.name, title: input.title, email: input.email, phone: input.phone, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
-  const batch = database.batch(); batch.create(reference, data); batch.create(audit.reference, audit.data); await batch.commit();
+  await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    const currentCompany = await transaction.get(companyReference);
+    if (!currentCompany.exists || JSON.stringify(recordAccess(currentCompany.data()!)) !== JSON.stringify(recordAccess(company))) throw new HttpsError("failed-precondition", "Company assignment changed; reload before retrying");
+    transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+  });
   return { contact: serializeContact({ id: reference.id, data }) };
 });
 
@@ -414,7 +461,10 @@ export const createCommercialActivity = onCall(callableOptions, async (request) 
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.activity_created", "activity", reference.id, "Activity created");
   const now = Timestamp.now();
   const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), kind: input.kind, subject: input.subject, companyName: input.companyName, dueAt: Timestamp.fromDate(new Date(input.dueAt)), completed: false, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
-  const batch = database.batch(); batch.create(reference, data); batch.create(audit.reference, audit.data); await batch.commit();
+  await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+  });
   return { activity: serializeActivity({ id: reference.id, data }) };
 });
 
@@ -429,7 +479,10 @@ export const createCommercialOpportunity = onCall(callableOptions, async (reques
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.opportunity_created", "opportunity", reference.id, "Opportunity created");
   const now = Timestamp.now();
   const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), title: input.title, companyName: input.companyName, stage: "discovery", amountCents: input.amountCents, currency: "USD", nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
-  const batch = database.batch(); batch.create(reference, data); batch.create(audit.reference, audit.data); await batch.commit();
+  await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+  });
   return { opportunity: serializeOpportunity({ id: reference.id, data }) };
 });
 
@@ -443,6 +496,7 @@ export const transitionCommercialOpportunity = onCall(callableOptions, async (re
   const reference = database.doc(`organizations/${input.organizationId}/opportunities/${input.recordId}`);
   let result: ReturnType<typeof serializeOpportunity> | undefined;
   await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("not-found", "Opportunity was not found");
     const data = snapshot.data()!; requireRecordAccess(actor, request.auth!.uid, data);
@@ -467,9 +521,11 @@ export const completeCommercialActivity = onCall(callableOptions, async (request
   const reference = database.doc(`organizations/${input.organizationId}/activities/${input.recordId}`);
   let result: ReturnType<typeof serializeActivity> | undefined;
   await database.runTransaction(async (transaction) => {
+    await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("not-found", "Activity was not found");
     const data = snapshot.data()!; requireRecordAccess(actor, request.auth!.uid, data);
+    if (data.completed === true) { result = serializeActivity({ id: snapshot.id, data }); return; }
     transaction.update(reference, { completed: true, completedAt: FieldValue.serverTimestamp(), updatedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, actor.email, "commercial.activity_completed", "activity", input.recordId, "Activity completed");
     transaction.create(audit.reference, audit.data);
