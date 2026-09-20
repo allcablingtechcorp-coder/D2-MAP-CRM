@@ -1,6 +1,14 @@
 node_modules/
+rules-tests/node_modules/
 dist/
+lib/
 *.tsbuildinfo
 .env
 .env.*
 !.env.example
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+firestore-debug.*.log
+.firebase/
+.tools/

@@ -15,7 +15,7 @@ import { getFunctions, httpsCallable, type Functions } from "firebase/functions"
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
 import type { FirebaseRuntimeConfig } from "./config";
-import { membershipFromDocument, membershipToDocument } from "./membershipDocument";
+import { membershipFromDocument } from "./membershipDocument";
 
 const firebaseAppName = "d2-crm-v2";
 
@@ -66,15 +66,26 @@ export class FirestoreMembershipRepository implements MembershipRepository {
     return snapshot.docs.map((membership) => membershipFromDocument(membership.id, membership.data()));
   }
 
-  async save(membership: Membership): Promise<void> {
+  async save(membership: Membership, reason: string): Promise<void> {
     const saveMembership = httpsCallable<
-      { organizationId: string; uid: string; membership: ReturnType<typeof membershipToDocument> },
-      { saved: true }
+      {
+        organizationId: string;
+        targetUid: string;
+        patch: Pick<Membership, "role" | "status" | "scope" | "modules">;
+        reason: string;
+      },
+      { saved: true; auditEventId: string }
     >(this.functions, "saveMembership");
     await saveMembership({
       organizationId: this.organizationId,
-      uid: membership.uid,
-      membership: membershipToDocument(membership),
+      targetUid: membership.uid,
+      patch: {
+        role: membership.role,
+        status: membership.status,
+        scope: membership.scope,
+        modules: membership.modules,
+      },
+      reason,
     });
   }
 }

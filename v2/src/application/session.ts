@@ -23,7 +23,7 @@ export interface AuthGateway {
 export interface MembershipRepository {
   findByUid(uid: string): Promise<Membership | null>;
   list(): Promise<Membership[]>;
-  save(membership: Membership): Promise<void>;
+  save(membership: Membership, reason: string): Promise<void>;
 }
 
 export function resolveSession(identity: AuthIdentity | null, membership: Membership | null): SessionState {
