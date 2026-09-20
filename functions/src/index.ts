@@ -3,6 +3,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   InputValidationError,
+  canManageMemberships,
   isProtectedOwner,
   membershipChanges,
   parseMembershipDocument,
@@ -53,7 +54,7 @@ export const saveMembership = onCall({
       throw new HttpsError("failed-precondition", "Membership data is invalid");
     }
 
-    if (actor.role !== "owner" || actor.status !== "active") {
+    if (!canManageMemberships(actor)) {
       throw new HttpsError("permission-denied", "Active owner membership is required");
     }
     if (isProtectedOwner(target)) {

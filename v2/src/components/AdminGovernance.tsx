@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Clock3, History, LockKeyhole, MailPlus, ShieldCheck, UserPlus, UsersRound, X } from "lucide-react";
 import { demoMemberships } from "../data/demo";
 import type { AccessScope, Membership, MembershipStatus, ModuleId, RoleId } from "../domain/access";
+import { canManageMembership } from "../domain/access";
 import {
   buildAuditEvent,
   createInvitation,
@@ -62,6 +63,7 @@ export function AdminGovernance() {
   const [feedbackKey, setFeedbackKey] = useState<TranslationKey | "">("");
   const selected = memberships.find((member) => member.uid === selectedUid) ?? initialMembership;
   const actor = runtime.mode === "firebase" ? runtime.membership : memberships[0];
+  const canEditSelected = canManageMembership(actor, selected);
   const [draftRole, setDraftRole] = useState<RoleId>(selected.role);
   const [draftStatus, setDraftStatus] = useState<MembershipStatus>(selected.status);
   const [draftScope, setDraftScope] = useState<AccessScope>(selected.scope);
@@ -142,15 +144,15 @@ export function AdminGovernance() {
         <div className="access-detail">
           <div className="access-identity"><span className="member-avatar large">{initials(selected.displayName)}</span><div><strong>{selected.displayName}</strong><span>{selected.email}</span></div>{selected.ownerProtected && <span className="protected-chip"><LockKeyhole size={12} />{t("admin.protected")}</span>}</div>
           <div className="access-form-grid">
-            <label>{t("admin.assignedRole")}<select value={draftRole} onChange={(event) => { setDraftRole(event.target.value as RoleId); setReview(null); }} disabled={selected.ownerProtected}>{selected.ownerProtected && <option value="owner">{t(roleKeys.owner)}</option>}{assignableRoles.map((role) => <option key={role} value={role}>{t(roleKeys[role])}</option>)}</select></label>
-            <label>{t("admin.accessStatus")}<select value={draftStatus} onChange={(event) => { setDraftStatus(event.target.value as MembershipStatus); setReview(null); }} disabled={selected.ownerProtected}>{statuses.map((status) => <option key={status} value={status}>{t(statusKeys[status])}</option>)}</select></label>
-            <label>{t("admin.dataScope")}<select value={draftScope} onChange={(event) => { setDraftScope(event.target.value as AccessScope); setReview(null); }} disabled={selected.ownerProtected}>{scopes.map((scope) => <option key={scope} value={scope}>{t(scopeKeys[scope])}</option>)}</select></label>
+            <label>{t("admin.assignedRole")}<select value={draftRole} onChange={(event) => { setDraftRole(event.target.value as RoleId); setReview(null); }} disabled={!canEditSelected}>{selected.ownerProtected && <option value="owner">{t(roleKeys.owner)}</option>}{assignableRoles.map((role) => <option key={role} value={role}>{t(roleKeys[role])}</option>)}</select></label>
+            <label>{t("admin.accessStatus")}<select value={draftStatus} onChange={(event) => { setDraftStatus(event.target.value as MembershipStatus); setReview(null); }} disabled={!canEditSelected}>{statuses.map((status) => <option key={status} value={status}>{t(statusKeys[status])}</option>)}</select></label>
+            <label>{t("admin.dataScope")}<select value={draftScope} onChange={(event) => { setDraftScope(event.target.value as AccessScope); setReview(null); }} disabled={!canEditSelected}>{scopes.map((scope) => <option key={scope} value={scope}>{t(scopeKeys[scope])}</option>)}</select></label>
           </div>
           <div><span className="field-label">{t("admin.allowedModules")}</span><div className="module-tags">{selected.modules.map((module) => <span key={module}>{t(`nav.${module}` as TranslationKey)}</span>)}</div></div>
-          {!selected.ownerProtected && <label className="reason-field">{t("admin.changeReason")}<textarea value={reason} onChange={(event) => { setReason(event.target.value); setReview(null); }} placeholder={t("admin.changeReasonPlaceholder")} /></label>}
+          {canEditSelected && <label className="reason-field">{t("admin.changeReason")}<textarea value={reason} onChange={(event) => { setReason(event.target.value); setReview(null); }} placeholder={t("admin.changeReasonPlaceholder")} /></label>}
           {feedbackKey && <div className="governance-feedback" role="status">{t(feedbackKey)}</div>}
           {review && <div className="change-review"><div><ShieldCheck size={18} /><strong>{t("admin.reviewReady")}</strong></div><p>{t("admin.reviewFields", { count: review.changedFields.length })}</p><ul>{review.changedFields.map((field) => <li key={field}><span>{t(`admin.field.${field}` as TranslationKey)}</span><strong>{field === "role" ? t(roleKeys[review.after.role]) : field === "scope" ? t(scopeKeys[review.after.scope]) : field === "status" ? t(statusKeys[review.after.status]) : t("admin.modulesUnchanged")}</strong></li>)}</ul></div>}
-          <div className="access-actions">{review && <button className="action-button secondary" onClick={() => setReview(null)} disabled={saving}>{t("common.cancel")}</button>}<button className="action-button" disabled={selected.ownerProtected || saving} onClick={review ? confirmChange : reviewChange}>{review ? <Check size={16} /> : <ShieldCheck size={16} />}{review ? t("admin.confirmChange") : t("admin.review")}</button></div>
+          <div className="access-actions">{review && <button className="action-button secondary" onClick={() => setReview(null)} disabled={saving}>{t("common.cancel")}</button>}<button className="action-button" disabled={!canEditSelected || saving} onClick={review ? confirmChange : reviewChange}>{review ? <Check size={16} /> : <ShieldCheck size={16} />}{review ? t("admin.confirmChange") : t("admin.review")}</button></div>
           <small className="prototype-copy">{t(runtime.mode === "firebase" ? "admin.firebasePersistence" : "admin.prototype")}</small>
         </div>
       </Panel>

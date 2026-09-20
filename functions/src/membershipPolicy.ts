@@ -121,7 +121,12 @@ export function parseMembershipDocument(value: unknown): MembershipDocument {
 }
 
 export function isProtectedOwner(membership: MembershipDocument): boolean {
-  return membership.ownerProtected === true || membership.email === protectedOwnerEmail;
+  return membership.ownerProtected === true || membership.email.trim().toLowerCase() === protectedOwnerEmail;
+}
+
+export function canManageMemberships(actor: MembershipDocument): boolean {
+  return actor.role === "owner" && actor.status === "active" && actor.modules.includes("admin")
+    && actor.permissionOverrides?.["membership.manage"] !== false;
 }
 
 export function removesActiveOwner(before: MembershipDocument, patch: MembershipPatch): boolean {

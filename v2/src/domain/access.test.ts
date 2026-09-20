@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canAccessModule,
+  canPerformCommercialAction,
   canManageMembership,
   hasPermission,
   type Membership,
@@ -14,11 +15,25 @@ const member = (role: RoleId, overrides: Partial<Membership> = {}): Membership =
   role,
   status: "active",
   scope: role === "owner" ? "organization" : "assigned_records",
-  modules: ["dashboard", "leads"],
+  modules: ["dashboard", "leads", "admin"],
   ...overrides,
 });
 
 describe("access policy", () => {
+  it("blocks writes and exports for viewers, revoked users and unassigned modules", () => {
+    for (const permission of ["lead.create", "opportunity.update", "activity.create", "report.export"] as const) {
+      expect(canPerformCommercialAction(member("viewer"), permission)).toBe(false);
+      expect(canPerformCommercialAction(member("owner", { status: "revoked" }), permission)).toBe(false);
+    }
+    expect(canPerformCommercialAction(member("sales_rep"), "lead.create")).toBe(true);
+    expect(canPerformCommercialAction(member("owner", { modules: ["dashboard"] }), "lead.create")).toBe(false);
+    expect(canPerformCommercialAction(null, "lead.create")).toBe(true);
+  });
+  it("does not turn an assigned admin module into administrator permissions", () => {
+    expect(canAccessModule(member("sales_rep"), "admin")).toBe(false);
+    expect(canAccessModule(member("owner", { permissionOverrides: { "audit.read": false } }), "admin")).toBe(false);
+    expect(canManageMembership(member("owner", { modules: ["leads"] }), member("viewer"))).toBe(false);
+  });
   it("denies every permission for suspended memberships", () => {
     const suspended = member("owner", { status: "suspended" });
     expect(hasPermission(suspended, "organization.manage")).toBe(false);

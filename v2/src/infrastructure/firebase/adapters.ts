@@ -10,7 +10,7 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, type Firestore, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, type Firestore, type Timestamp } from "firebase/firestore";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
@@ -56,6 +56,15 @@ export class FirestoreMembershipRepository implements MembershipRepository {
     private readonly functions: Functions,
     private readonly organizationId: string,
   ) {}
+
+  observeByUid(uid: string, listener: (membership: Membership | null) => void, onError: () => void): () => void {
+    return onSnapshot(doc(this.database, "organizations", this.organizationId, "memberships", uid), { includeMetadataChanges: true }, (snapshot) => {
+      // A cached active membership must not authorize an offline session.
+      if (snapshot.metadata.fromCache) { onError(); return; }
+      try { listener(snapshot.exists() ? membershipFromDocument(snapshot.id, snapshot.data()) : null); }
+      catch { onError(); }
+    }, onError);
+  }
 
   async findByUid(uid: string): Promise<Membership | null> {
     const snapshot = await getDoc(doc(this.database, "organizations", this.organizationId, "memberships", uid));

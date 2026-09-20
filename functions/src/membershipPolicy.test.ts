@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InputValidationError,
+  canManageMemberships,
   isProtectedOwner,
   membershipChanges,
   parseMembershipDocument,
@@ -19,6 +20,14 @@ const member: MembershipDocument = {
 };
 
 describe("saveMembership policy", () => {
+  it("requires an active owner, admin module and no permission denial", () => {
+    const owner: MembershipDocument = { ...member, role: "owner", modules: ["admin"] };
+    expect(canManageMemberships(owner)).toBe(true);
+    expect(canManageMemberships({ ...owner, status: "suspended" })).toBe(false);
+    expect(canManageMemberships({ ...owner, modules: [] })).toBe(false);
+    expect(canManageMemberships({ ...owner, permissionOverrides: { "membership.manage": false } })).toBe(false);
+    expect(canManageMemberships({ ...owner, role: "operations_admin", permissionOverrides: { "membership.manage": true } })).toBe(false);
+  });
   it("normalizes a strict command and removes duplicate modules", () => {
     expect(parseSaveMembershipInput({
       organizationId: "d2-group",

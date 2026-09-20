@@ -4,11 +4,12 @@ import type { Membership } from "../domain/access";
 import { Brand } from "../components/Brand";
 import { useI18n, type Locale } from "../i18n/i18n";
 import { currentBackendRuntimeConfig, type FirebaseRuntimeConfig } from "../infrastructure/firebase/config";
-import { resolveSession, type AuthGateway, type AuthIdentity, type MembershipRepository, type SessionState } from "./session";
+import { type AuthGateway, type AuthIdentity, type MembershipRepository, type SessionState } from "./session";
+import { observeSession } from "./observeSession";
 
 type RuntimeSession =
   | { mode: "demo"; identity: null; membership: null }
-  | { mode: "firebase"; identity: AuthIdentity; membership: Membership; memberships: MembershipRepository };
+  | { mode: "firebase"; identity: AuthIdentity; membership: Membership; memberships: MembershipRepository; organizationId: string; signOut: () => Promise<void>; actionError: boolean };
 
 const RuntimeSessionContext = createContext<RuntimeSession>({ mode: "demo", identity: null, membership: null });
 
@@ -49,39 +50,19 @@ function FirebaseRuntimeBoundary({ config, children }: { config: FirebaseRuntime
 
   if (initializationError) return <SessionScreen state="configuration_error" />;
   if (!gateways) return <SessionScreen state="loading" />;
-  return <FirebaseSessionBoundary {...gateways}>{children}</FirebaseSessionBoundary>;
+  return <FirebaseSessionBoundary {...gateways} organizationId={config.organizationId}>{children}</FirebaseSessionBoundary>;
 }
 
-function FirebaseSessionBoundary({ auth, memberships, children }: { auth: AuthGateway; memberships: MembershipRepository; children: ReactNode }) {
+function FirebaseSessionBoundary({ auth, memberships, organizationId, children }: { auth: AuthGateway; memberships: MembershipRepository; organizationId: string; children: ReactNode }) {
   const [session, setSession] = useState<SessionState>({ status: "loading" });
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
-  useEffect(() => {
-    let revision = 0;
-    const unsubscribe = auth.observeIdentity((identity) => {
-      const currentRevision = ++revision;
-      setActionError(false);
-      setLookupErrorIdentity(null);
-      if (!identity) {
-        setSession({ status: "signed_out" });
-        return;
-      }
-      setSession({ status: "loading" });
-      memberships.findByUid(identity.uid)
-        .then((membership) => {
-          if (revision === currentRevision) setSession(resolveSession(identity, membership));
-        })
-        .catch(() => {
-          if (revision === currentRevision) setLookupErrorIdentity(identity);
-        });
-    });
-    return () => {
-      revision += 1;
-      unsubscribe();
-    };
-  }, [auth, memberships]);
+  useEffect(() => observeSession(auth, memberships, (state) => {
+    setActionError(false);
+    setSession(state);
+  }, setLookupErrorIdentity), [auth, memberships]);
 
   const signIn = async () => {
     setSigningIn(true);
@@ -111,7 +92,7 @@ function FirebaseSessionBoundary({ auth, memberships, children }: { auth: AuthGa
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 
   return (
-    <RuntimeSessionContext.Provider value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships }}>
+    <RuntimeSessionContext.Provider key={`${organizationId}:${session.identity.uid}`} value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, organizationId, signOut, actionError }}>
       {children}
     </RuntimeSessionContext.Provider>
   );

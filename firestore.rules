@@ -17,7 +17,13 @@ service cloud.firestore {
 
     function isActiveAdministrator(organizationId) {
       return isActiveMember(organizationId)
-        && actorMembership(organizationId).data.role in ["owner", "operations_admin"];
+        && actorMembership(organizationId).data.role in ["owner", "operations_admin"]
+        && "admin" in actorMembership(organizationId).data.modules;
+    }
+
+    function canReadGovernance(organizationId, permission) {
+      return isActiveAdministrator(organizationId)
+        && actorMembership(organizationId).data.get("permissionOverrides", {}).get(permission, true) == true;
     }
 
     match /organizations/{organizationId} {
@@ -25,18 +31,18 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
 
       match /memberships/{uid} {
-        allow get: if signedIn() && (request.auth.uid == uid || isActiveAdministrator(organizationId));
-        allow list: if isActiveAdministrator(organizationId);
+        allow get: if signedIn() && (request.auth.uid == uid || canReadGovernance(organizationId, "membership.read"));
+        allow list: if canReadGovernance(organizationId, "membership.read");
         allow create, update, delete: if false;
       }
 
       match /invitations/{invitationId} {
-        allow read: if isActiveAdministrator(organizationId);
+        allow read: if canReadGovernance(organizationId, "membership.read");
         allow create, update, delete: if false;
       }
 
       match /auditEvents/{eventId} {
-        allow read: if isActiveAdministrator(organizationId);
+        allow read: if canReadGovernance(organizationId, "audit.read");
         allow create, update, delete: if false;
       }
 
