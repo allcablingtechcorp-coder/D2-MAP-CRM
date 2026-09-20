@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { ModuleId } from "../domain/access";
 import { useI18n, type Locale, type TranslationKey } from "../i18n/i18n";
+import { LanguageFlag } from "./LanguageFlag";
 import { Brand } from "./Brand";
 
 export interface NavigationItem {
@@ -136,7 +137,7 @@ export function AppShell({
             <div className="language-switcher" role="group" aria-label={t("language.label")}>
               {(["pt", "en", "es"] as Locale[]).map((language) => (
                 <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language} title={t(`language.${language}` as TranslationKey)}>
-                  <span aria-hidden="true">{language === "pt" ? "🇧🇷" : language === "en" ? "🇺🇸" : "🇪🇸"}</span>
+                  <LanguageFlag locale={language} />
                   <span>{language.toUpperCase()}</span>
                 </button>
               ))}

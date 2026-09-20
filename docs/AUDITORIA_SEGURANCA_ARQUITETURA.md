@@ -12,6 +12,12 @@ Esta auditoria examinou código, testes, workflow e configurações visíveis no
 
 ## Correções desta entrega
 
+### Atualização do bloco comercial
+
+Foi implementada a primeira camada de persistência comercial no Firebase para leads, oportunidades e atividades. O cliente autenticado não grava diretamente no Firestore: comandos callable validam associação ativa, papel, permissão, módulo e escopo antes de ler ou alterar registros. Propriedade, criador e timestamps são derivados no servidor. O workspace Firebase começa vazio e não importa automaticamente registros demonstrativos locais.
+
+O escopo organizacional e o escopo por responsável estão operacionais. A política de equipes está implementada no servidor e falha fechada quando não há `teamIds`, mas ainda falta o editor administrativo de equipes e atribuições. Empresas e contatos continuam derivados dos leads; ainda precisam de coleções e contratos próprios. Portanto, este avanço reduz a principal lacuna, mas não conclui integralmente o P1 comercial.
+
 | ID | Problema comprovado | Correção |
 |---|---|---|
 | A01 | A associação era lida uma vez no login; suspensão posterior não atualizava o workspace aberto | Assinatura Firestore em tempo real; alteração, exclusão e falha de leitura retiram o acesso. Uma associação ativa apenas em cache não autoriza a sessão |

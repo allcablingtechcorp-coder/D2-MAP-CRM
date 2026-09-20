@@ -64,7 +64,12 @@ export type AuditAction =
   | "membership.updated"
   | "membership.suspended"
   | "membership.revoked"
-  | "report.exported";
+  | "report.exported"
+  | "commercial.lead_created"
+  | "commercial.activity_created"
+  | "commercial.activity_completed"
+  | "commercial.opportunity_created"
+  | "commercial.opportunity_stage_changed";
 
 export interface AuditEvent {
   id: string;
@@ -72,7 +77,7 @@ export interface AuditEvent {
   action: AuditAction;
   actorUid: string;
   actorEmail: string;
-  targetType: "membership" | "invitation" | "report" | "session";
+  targetType: "membership" | "invitation" | "report" | "session" | "lead" | "activity" | "opportunity";
   targetId: string;
   summary: string;
   reason?: string;

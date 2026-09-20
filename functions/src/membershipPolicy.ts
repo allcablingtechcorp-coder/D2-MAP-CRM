@@ -18,6 +18,7 @@ export interface MembershipDocument {
   scope: AccessScope;
   modules: ModuleId[];
   permissionOverrides?: Record<string, boolean>;
+  teamIds?: string[];
   ownerProtected?: boolean;
 }
 
@@ -107,6 +108,9 @@ export function parseMembershipDocument(value: unknown): MembershipDocument {
   if (value.permissionOverrides !== undefined && (!isRecord(value.permissionOverrides) || Object.values(value.permissionOverrides).some((item) => typeof item !== "boolean"))) {
     throw new InputValidationError("Membership permission overrides are invalid");
   }
+  if (value.teamIds !== undefined && (!Array.isArray(value.teamIds) || value.teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item)))) {
+    throw new InputValidationError("Membership teams are invalid");
+  }
 
   return {
     email,
@@ -116,6 +120,7 @@ export function parseMembershipDocument(value: unknown): MembershipDocument {
     scope,
     modules: [...new Set(moduleValues)],
     ...(value.permissionOverrides ? { permissionOverrides: value.permissionOverrides as Record<string, boolean> } : {}),
+    ...(value.teamIds ? { teamIds: [...new Set(value.teamIds)] } : {}),
     ...(value.ownerProtected !== undefined ? { ownerProtected: value.ownerProtected } : {}),
   };
 }

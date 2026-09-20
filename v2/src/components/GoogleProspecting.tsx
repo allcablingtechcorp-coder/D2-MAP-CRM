@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, MapPin, Plus, Route, Search, Sparkles } from "lucide-react";
 import { useI18n, type TranslationKey } from "../i18n/i18n";
-import { useCrmWorkspace } from "../application/CrmWorkspace";
+import { useCrmWorkspace } from "../application/CrmWorkspaceLive";
 import { LeadDialog } from "./CommercialDialogs";
 import { PageHeader } from "./AppShell";
 

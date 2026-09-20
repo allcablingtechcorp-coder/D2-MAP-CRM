@@ -15,6 +15,9 @@ import { getFunctions, httpsCallable, type Functions } from "firebase/functions"
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
 import type { AuditAction, AuditEvent } from "../../domain/governance";
+import type { Activity, Lead, Opportunity, OpportunityStage } from "../../domain/crm";
+import type { LeadInput } from "../../domain/workflows";
+import type { CommercialRepository, CommercialWorkspaceSnapshot } from "../../application/commercial";
 import type { FirebaseRuntimeConfig } from "./config";
 import { membershipFromDocument } from "./membershipDocument";
 
@@ -83,18 +86,24 @@ export class FirestoreMembershipRepository implements MembershipRepository {
       limit(100),
     );
     const snapshot = await getDocs(auditQuery);
+    const summaries: Partial<Record<AuditAction, string>> = {
+      "membership.updated": "admin.auditAccessUpdated", "membership.suspended": "admin.auditAccessUpdated", "membership.revoked": "admin.auditAccessUpdated",
+      "commercial.lead_created": "admin.auditLeadCreated", "commercial.activity_created": "admin.auditActivityCreated", "commercial.activity_completed": "admin.auditActivityCompleted",
+      "commercial.opportunity_created": "admin.auditOpportunityCreated", "commercial.opportunity_stage_changed": "admin.auditOpportunityStageChanged",
+    };
     return snapshot.docs.map((entry) => {
       const data = entry.data();
       const occurredAt = data.occurredAt as Timestamp | undefined;
+      const action = data.action as AuditAction;
       return {
         id: entry.id,
         organizationId: this.organizationId,
-        action: data.action as AuditAction,
+        action,
         actorUid: String(data.actorUid ?? ""),
         actorEmail: String(data.actorEmail ?? ""),
-        targetType: "membership",
+        targetType: String(data.targetType ?? "membership") as AuditEvent["targetType"],
         targetId: String(data.targetId ?? ""),
-        summary: "admin.auditAccessUpdated",
+        summary: summaries[action] ?? "admin.auditAccessUpdated",
         ...(typeof data.reason === "string" ? { reason: data.reason } : {}),
         occurredAt: occurredAt?.toDate().toISOString() ?? new Date(0).toISOString(),
       };
@@ -125,6 +134,52 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   }
 }
 
+type CallableWorkspace = { leads: Lead[]; opportunities: Opportunity[]; activities: Activity[] };
+
+export class FirebaseCommercialRepository implements CommercialRepository {
+  constructor(private readonly functions: Functions, private readonly organizationId: string) {}
+
+  async load(): Promise<CommercialWorkspaceSnapshot> {
+    const callable = httpsCallable<{ organizationId: string }, CallableWorkspace>(this.functions, "loadCommercialWorkspace");
+    const result = await callable({ organizationId: this.organizationId });
+    return result.data;
+  }
+
+  async createLead(input: LeadInput) {
+    const callable = httpsCallable<
+      { organizationId: string; companyName: string; location: string; source: Lead["source"]; priority: Lead["priority"]; nextAction: string; nextActionAt: string },
+      { lead: Lead }
+    >(this.functions, "createCommercialLead");
+    try {
+      const result = await callable({ organizationId: this.organizationId, companyName: input.companyName, location: input.location, source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: input.nextActionAt });
+      return { ok: true as const, lead: result.data.lead };
+    } catch (error) {
+      if ((error as { code?: string }).code === "functions/already-exists") return { ok: false as const, reason: "duplicate" as const };
+      throw error;
+    }
+  }
+
+  async createActivity(input: Omit<Activity, "id" | "completed">): Promise<Activity> {
+    const callable = httpsCallable<{ organizationId: string; kind: Activity["kind"]; subject: string; companyName: string; dueAt: string }, { activity: Activity }>(this.functions, "createCommercialActivity");
+    return (await callable({ organizationId: this.organizationId, kind: input.kind, subject: input.subject, companyName: input.companyName, dueAt: input.dueAt })).data.activity;
+  }
+
+  async createOpportunity(input: Omit<Opportunity, "id" | "stage" | "currency">): Promise<Opportunity> {
+    const callable = httpsCallable<{ organizationId: string; title: string; companyName: string; amountCents: number | null; nextAction: string; expectedCloseAt: string }, { opportunity: Opportunity }>(this.functions, "createCommercialOpportunity");
+    return (await callable({ organizationId: this.organizationId, title: input.title, companyName: input.companyName, amountCents: input.amountCents, nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt })).data.opportunity;
+  }
+
+  async transitionOpportunity(id: string, stage: OpportunityStage): Promise<Opportunity> {
+    const callable = httpsCallable<{ organizationId: string; recordId: string; stage: OpportunityStage }, { opportunity: Opportunity }>(this.functions, "transitionCommercialOpportunity");
+    return (await callable({ organizationId: this.organizationId, recordId: id, stage })).data.opportunity;
+  }
+
+  async completeActivity(id: string): Promise<Activity> {
+    const callable = httpsCallable<{ organizationId: string; recordId: string }, { activity: Activity }>(this.functions, "completeCommercialActivity");
+    return (await callable({ organizationId: this.organizationId, recordId: id })).data.activity;
+  }
+}
+
 function initializeFirebaseApp(config: FirebaseRuntimeConfig): FirebaseApp {
   return getApps().some((app) => app.name === firebaseAppName)
     ? getApp(firebaseAppName)
@@ -134,14 +189,17 @@ function initializeFirebaseApp(config: FirebaseRuntimeConfig): FirebaseApp {
 export function createFirebaseGateways(config: FirebaseRuntimeConfig): {
   auth: AuthGateway;
   memberships: MembershipRepository;
+  commercial: CommercialRepository;
 } {
   const app = initializeFirebaseApp(config);
+  const functions = getFunctions(app, config.functionsRegion);
   return {
     auth: new FirebaseAuthGateway(getAuth(app)),
     memberships: new FirestoreMembershipRepository(
       getFirestore(app),
-      getFunctions(app, config.functionsRegion),
+      functions,
       config.organizationId,
     ),
+    commercial: new FirebaseCommercialRepository(functions, config.organizationId),
   };
 }

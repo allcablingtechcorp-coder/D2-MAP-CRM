@@ -1,0 +1,7 @@
+import type { Locale } from "../i18n/i18n";
+
+export function LanguageFlag({ locale }: { locale: Locale }) {
+  if (locale === "pt") return <svg className="language-flag" viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="2" fill="#169B62"/><path d="M14 2.7 25 10 14 17.3 3 10Z" fill="#FFDF00"/><circle cx="14" cy="10" r="4.4" fill="#002776"/><path d="M10.3 8.6c2.7-.7 5.7.1 7.7 2" fill="none" stroke="#fff" strokeWidth="1"/></svg>;
+  if (locale === "en") return <svg className="language-flag" viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="2" fill="#fff"/><path d="M0 0h28v2H0zm0 4h28v2H0zm0 4h28v2H0zm0 4h28v2H0zm0 4h28v2H0" fill="#B22234"/><path d="M0 0h12v11H0Z" fill="#3C3B6E"/><g fill="#fff"><circle cx="2" cy="2" r=".65"/><circle cx="5" cy="2" r=".65"/><circle cx="8" cy="2" r=".65"/><circle cx="11" cy="2" r=".65"/><circle cx="3.5" cy="4.5" r=".65"/><circle cx="6.5" cy="4.5" r=".65"/><circle cx="9.5" cy="4.5" r=".65"/><circle cx="2" cy="7" r=".65"/><circle cx="5" cy="7" r=".65"/><circle cx="8" cy="7" r=".65"/><circle cx="11" cy="7" r=".65"/><circle cx="3.5" cy="9.3" r=".65"/><circle cx="6.5" cy="9.3" r=".65"/><circle cx="9.5" cy="9.3" r=".65"/></g></svg>;
+  return <svg className="language-flag" viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="2" fill="#AA151B"/><path d="M0 5h28v10H0Z" fill="#F1BF00"/><path d="M7 8h3v5H7Z" fill="#AA151B"/><path d="M6.3 7.2h4.4v1H6.3Z" fill="#AA151B"/></svg>;
+}

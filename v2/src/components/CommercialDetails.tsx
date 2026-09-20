@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Activity, BriefcaseBusiness, CalendarClock, CircleDollarSign, MapPin, Plus, UserRound, X } from "lucide-react";
-import { useCrmWorkspace } from "../application/CrmWorkspace";
+import { useCrmWorkspace } from "../application/CrmWorkspaceLive";
 import type { Lead } from "../domain/crm";
 import { openStages } from "../domain/crm";
 import { useI18n, type TranslationKey } from "../i18n/i18n";
