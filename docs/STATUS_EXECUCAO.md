@@ -40,6 +40,12 @@
 - Aplicado o filtro de módulos da associação à navegação e o contexto real de identidade e papel ao shell.
 - Fixado o SDK modular Firebase `12.19.0` e mantido o build público no modo demonstrativo.
 - Documentado o contrato e os critérios de ativação em `docs/INTEGRACAO_FIREBASE.md`.
+- Conectada a Firebase CLI à conta proprietária e confirmado o projeto `d2-map-crm`.
+- Confirmados Firestore Native Standard em `nam5`, aplicativo Web, Google Authentication e domínio do GitHub Pages.
+- Implementada a callable Function `saveMembership` com autorização do proprietário, proteção da conta corporativa, defesa contra remoção do último proprietário e auditoria transacional.
+- Implementadas regras Firestore de negação padrão, leitura administrativa controlada e bloqueio de gravações diretas de governança.
+- Adicionados 6 testes de política das Functions e 7 testes de regras no Firestore Emulator.
+- Adicionado job de validação de backend ao workflow do GitHub Pages; a publicação do frontend depende da aprovação desses testes.
 
 ## Evidências de validação
 
@@ -58,12 +64,15 @@
 | Ficha e filtros | Filtro por qualificação, abertura da ficha e ação contextual validados no navegador |
 | GitHub Pages | Publicação por workflow aprovada e URL pública validada com HTTP 200 |
 | Dependências de produção | `npm audit --omit=dev` aprovado; zero vulnerabilidades encontradas |
+| Política da Function | 6 testes aprovados |
+| Regras Firestore | 7 testes aprovados no Emulator Suite com JRE 21 |
+| Build das Functions | TypeScript aprovado para Node.js 22 |
 
 ## Limite técnico identificado
 
-A consulta `firestore:databases:list --project d2-map-crm` retornou HTTP 403 para a sessão Firebase CLI autenticada como `dantefrota@gmail.com`. Portanto, não existem dados suficientes para verificar a edição e a região do Firestore.
+O projeto `d2-map-crm` está no plano Spark. A documentação oficial do Firebase exige o plano Blaze para implantar Cloud Functions. Por isso, a Function e as regras foram preparadas e testadas localmente, mas não foram implantadas em produção.
 
-Os adaptadores cliente foram implementados sem ativação. Até essa informação ser obtida com uma conta autorizada, regras, índices, Cloud Functions, testes do Emulator Suite e migração de produção permanecem fora da publicação.
+O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dependências transitivas do SDK oficial (`firebase-admin` → bibliotecas Google → `uuid`) sem correção disponível na árvore fixada em 19 de setembro de 2026. O cliente V2 continua com zero vulnerabilidades de produção informadas pelo npm.
 
 ## Estado da publicação
 
@@ -71,4 +80,4 @@ A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/`
 
 ## Próximo marco
 
-Para produção real, liberar acesso administrativo ao projeto `d2-map-crm`, confirmar edição e região, implementar `saveMembership`, regras, auditoria confiável e testes do Emulator Suite. Depois disso, substituir a persistência demonstrativa por repositórios comerciais e ativar `VITE_CRM_BACKEND=firebase` primeiro em homologação.
+Para produção real, migrar o projeto para Blaze com controles de orçamento, implantar `saveMembership`, regras e índices, criar a associação protegida do proprietário e homologar autenticação e governança. Depois disso, substituir a persistência demonstrativa por repositórios comerciais e ativar `VITE_CRM_BACKEND=firebase` no build publicado.

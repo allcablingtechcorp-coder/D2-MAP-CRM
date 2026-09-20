@@ -2,9 +2,20 @@
 
 ## Estado verificado em 19 de setembro de 2026
 
-A aplicação V2 pública permanece no modo demonstrativo. A conta ativa na Firebase CLI é `dantefrota@gmail.com`; essa conta não lista o projeto `d2-map-crm` e recebe HTTP 403 ao consultar aplicativos e bancos Firestore desse projeto. Não houve leitura, gravação ou alteração de configuração no ambiente Firebase de produção.
+A aplicação V2 pública permanece no modo demonstrativo. A conta proprietária `allcablingtechcorp@gmail.com` foi conectada à Firebase CLI e o acesso administrativo ao projeto `d2-map-crm` foi confirmado em modo de leitura.
 
-O código cliente necessário para a próxima fase foi preparado em `v2/src/infrastructure/firebase/`. A ativação exige acesso administrativo ao projeto, confirmação da região do Firestore e implantação do backend confiável descrito neste documento.
+O ambiente existente possui:
+
+- Cloud Firestore Native, banco `(default)`, edição Standard e região multirregional `nam5`;
+- camada gratuita ativa;
+- aplicativo Web `D2 CRM MAP`;
+- Firebase Authentication com Google habilitado;
+- `allcablingtechcorp-coder.github.io` entre os domínios autorizados;
+- quatro identidades cadastradas no Authentication;
+- coleções legadas `users` e `visitas` no Firestore;
+- plano Spark.
+
+Nenhuma coleção, documento, regra, índice, provedor ou configuração de produção foi alterado nesta etapa.
 
 ## Componentes implementados
 
@@ -14,6 +25,11 @@ O código cliente necessário para a próxima fase foi preparado em `v2/src/infr
 | `adapters.ts` | Autenticar com Google, observar a sessão, ler associações e chamar o comando administrativo seguro |
 | `membershipDocument.ts` | Validar documentos externos antes de transformá-los em associações do domínio |
 | `.env.example` | Documentar as variáveis necessárias sem armazenar credenciais reais |
+| `functions/src/index.ts` | Executar a alteração administrativa autenticada em uma transação |
+| `functions/src/membershipPolicy.ts` | Validar o comando, documentos, proprietário protegido e diferenças auditáveis |
+| `firestore.rules` | Negar por padrão, permitir leituras autorizadas e bloquear toda gravação direta de governança |
+| `rules-tests/` | Validar regras positivas e negativas contra o Firestore Emulator |
+| `firebase.json` | Fixar região, regras, índices, Functions e portas do Emulator Suite |
 
 O SDK modular Firebase `12.19.0` foi fixado no `package.json`. A documentação oficial recomenda o SDK modular com empacotador para permitir remoção de código não utilizado. O build separa os adaptadores em um arquivo carregado sob demanda; no modo demonstrativo, o navegador não solicita nem executa esse arquivo.
 
@@ -68,42 +84,56 @@ Alterações administrativas não gravam diretamente no Firestore. `MembershipRe
 ```text
 request.auth.uid
 organizationId
-uid do usuário alvo
-membership sem o uid duplicado
+targetUid
+patch: role, status, scope e modules
+reason
 ```
 
-A Cloud Function ainda precisa ser criada e deve executar, no servidor, as seguintes operações em uma única transação:
+A Cloud Function implementada executa, no servidor, as seguintes operações em uma única transação:
 
 1. exigir identidade autenticada;
 2. carregar a associação do ator;
 3. exigir `membership.manage` e papel proprietário;
 4. rejeitar qualquer mudança no proprietário protegido `allcablingtechcorp@gmail.com`;
 5. impedir a remoção do último proprietário ativo;
-6. validar todos os campos do novo documento;
-7. gravar a associação;
-8. gravar o evento de auditoria com ator, alvo, motivo e diferenças antes/depois.
+6. impedir atribuição comum do papel proprietário;
+7. validar o comando e os documentos existentes;
+8. preservar e-mail, nome, proteção e substituições de permissão existentes;
+9. gravar somente os campos administrativos permitidos;
+10. gravar o evento de auditoria com ator, alvo, motivo e diferenças antes/depois.
 
-## Regras mínimas para homologação
+## Regras preparadas para homologação
 
-As regras ainda não foram geradas porque a edição, a região e o estado real do banco não puderam ser verificados. Quando o acesso for liberado, a política deve ser implementada e testada no Emulator Suite com estes princípios:
+A política local implementa estes princípios:
 
 - negação por padrão;
 - leitura da própria associação por usuário autenticado;
 - leitura de outras associações somente com permissão administrativa;
 - nenhuma gravação cliente em associações e eventos de auditoria;
-- acesso comercial limitado pela organização e pelo escopo efetivo;
-- testes negativos para usuário sem associação, suspenso, revogado, organização diferente e tentativa de escalada de papel.
+- caminhos desconhecidos e coleções legadas negados pela nova política até que seus contratos sejam migrados explicitamente.
+
+Os testes no Emulator Suite cobrem usuário anônimo, leitura da própria associação, usuário suspenso, proprietário, administrador operacional, vendedor, gravações diretas, convites, auditoria e caminhos desconhecidos. Resultado local: 7 testes aprovados.
+
+As regras atuais de produção não foram substituídas. O console mostra uma versão publicada em 31 de julho de 2026 baseada no modelo temporário de desenvolvimento, cujo próprio texto informa expiração após 30 dias. A substituição deve ocorrer junto da ativação do novo backend para evitar uma migração parcial.
+
+## Bloqueio para implantação das Functions
+
+O projeto está no plano Spark. Cloud Functions for Firebase exige o plano Blaze para implantação em produção. A Function pode ser compilada e emulada localmente, mas não pode ser publicada enquanto uma conta de faturamento não estiver vinculada ao projeto.
+
+A mudança para Blaze é uma decisão de faturamento e não foi executada automaticamente. Depois da ativação, devem ser configurados alertas de orçamento e limites de escala antes da primeira implantação.
 
 ## Critérios de ativação
 
-1. `d2-map-crm` aparece na lista da Firebase CLI com a conta autorizada.
-2. Aplicativo web, projeto, região e edição do Firestore são confirmados.
-3. Provedor Google e domínio do GitHub Pages são confirmados.
-4. `saveMembership` e gravação confiável de auditoria são implantados.
-5. Regras e índices passam nos testes do Emulator Suite.
-6. A associação protegida do proprietário é criada e validada.
-7. Login, bloqueio, módulos, escopos e logout passam em homologação.
-8. Somente então `VITE_CRM_BACKEND=firebase` é usado no build publicado.
+1. [Concluído] `d2-map-crm` aparece na lista da Firebase CLI com a conta proprietária.
+2. [Concluído] Aplicativo Web, projeto, região e edição do Firestore foram confirmados.
+3. [Concluído] Provedor Google e domínio do GitHub Pages foram confirmados.
+4. [Concluído localmente] `saveMembership`, auditoria transacional, regras e índices foram implementados.
+5. [Concluído localmente] Regras e políticas passaram nos testes automatizados.
+6. [Pendente] Migrar o projeto para Blaze com orçamento controlado.
+7. [Pendente] Implantar Function, regras e índices.
+8. [Pendente] Criar e validar a associação protegida do proprietário.
+9. [Pendente] Testar login, bloqueio, módulos, escopos, alteração administrativa e logout em homologação.
+10. [Pendente] Ativar `VITE_CRM_BACKEND=firebase` no build público.
 
 ## Referências oficiais
 
@@ -112,3 +142,5 @@ As regras ainda não foram geradas porque a edição, a região e o estado real 
 - https://firebase.google.com/docs/auth/web/google-signin
 - https://firebase.google.com/docs/firestore/security/get-started
 - https://firebase.google.com/docs/emulator-suite/connect_firestore
+- https://firebase.google.com/docs/functions/callable
+- https://firebase.google.com/docs/functions/get-started
