@@ -93,7 +93,8 @@ Corrigidos atualização de sessão após revogação, logout, negações de per
 | Conta proprietária | Associação ativa; papel, status e escopo protegidos contra edição |
 | Administração Firebase | Uma associação real carregada; trilha de auditoria inicial sem eventos |
 | Google Maps em produção | 20 resultados reais, marcadores, zoom e seleção de empresa validados |
-| Idiomas em produção | Administração autenticada validada em PT, EN e ES |
+| Idiomas em produção | Administração autenticada validada em PT, EN e ES; bandeiras SVG e persistência de EN após recarga confirmadas |
+| Functions comerciais | Seis callables Node.js 22 ativas em `us-central1` |
 
 ## Limite técnico identificado
 
@@ -105,7 +106,7 @@ O `npm audit --omit=dev` das Functions informa vulnerabilidades moderadas em dep
 
 ## Estado da publicação
 
-A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login e governança Firebase ativos. Esta atualização adiciona a persistência real de leads, oportunidades e atividades e será considerada ativa após a aprovação do workflow e a implantação das novas Functions.
+A V2 está publicada em `https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/` com login, governança e persistência Firebase ativos. O workflow do GitHub Pages foi aprovado e as seis Functions comerciais estão implantadas em `us-central1` com Node.js 22.
 
 ## Próximo marco
 
