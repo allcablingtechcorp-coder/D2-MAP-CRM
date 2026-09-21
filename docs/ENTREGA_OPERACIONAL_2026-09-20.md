@@ -13,7 +13,7 @@ Endereço: https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/
 5. Informar o motivo de cada manutenção. Se outro usuário tiver alterado o registro, recarregar os dados antes de salvar: a versão anterior é rejeitada pelo servidor.
 6. Consultar os relatórios e exportações autorizados. Registros arquivados saem das listas e indicadores ativos. Os logos originais permanecem na interface e nos relatórios.
 
-Inglês é o idioma inicial. Português e espanhol permanecem disponíveis com bandeiras. A seleção continua gravada no navegador e agora também na preferência da conta autenticada no Firebase. Se a sincronização falhar, a interface informa o erro; a preferência local continua válida.
+Inglês é o idioma inicial. A ordem das bandeiras na tela de entrada e no aplicativo é **Estados Unidos, Brasil e Espanha**. A seleção continua gravada no navegador e agora também na preferência da conta autenticada no Firebase. Se a sincronização falhar, a interface informa o erro; a preferência local continua válida.
 
 ## Manutenção comercial entregue
 
@@ -48,7 +48,7 @@ Suspender/revogar um membro impede chamadas comerciais. A conta proprietária n�
 - Manutenção exibe 25 registros por página. Grandes volumes ainda exigem memória no navegador: agregações analíticas no servidor são evolução futura, não capacidade ilimitada prometida.
 - Limite de 360 chamadas autenticadas por usuário/minuto, compartilhado entre as Functions; máximo de três instâncias por função. Excedido o limite, aguardar um minuto.
 - Chave dedicada do Google Maps restrita ao domínio `allcablingtechcorp-coder.github.io` e às APIs Maps JavaScript, Places e Geocoding. A chave genérica anterior foi preservada para não interromper outros aplicativos.
-- App Check com reCAPTCHA Enterprise registrado para o aplicativo web. A exigência no backend será registrada na evidência de publicação após validação de token real.
+- App Check com reCAPTCHA Enterprise obrigatório nas 19 Functions, ativado depois de observar tokens reais válidos. Manter `CRM_ENFORCE_APPCHECK=true` no arquivo de ambiente do backend em publicações futuras. Não versionar arquivos de ambiente.
 - Conta de serviço dedicada `d2-crm-runtime`, com `roles/datastore.user` e `roles/logging.logWriter`; as Functions deixam de executar com a conta padrão que tinha Editor. Os papéis da conta antiga não foram alterados, pois outros serviços podem utilizá-la.
 
 O limite por usuário e as restrições de chave reduzem abuso, mas não constituem teto financeiro. Não foi inventado um orçamento mensal nem modificada uma quota global do projeto compartilhado de Maps. Custos dependem do uso de APIs, Firestore, Functions, recuperação e monitoramento.
@@ -78,7 +78,16 @@ Ainda é necessário executar com contas reais de vendedor, gestor e leitor: ace
 
 ### Evidência de publicação
 
-A preencher após o workflow e a inspeção online da versão desta entrega. Não confundir compilação ou deploy do backend com a conclusão da publicação frontend.
+- [PR #11](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/pull/11) incorporado à `main`; commit funcional `2c0587a`.
+- [Validação do PR](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/actions/runs/35550560171) e [publicação Pages](https://github.com/allcablingtechcorp-coder/D2-MAP-CRM/actions/runs/35550631578) concluídas com sucesso. As quatro suítes totalizam 101 testes.
+- As 19 Functions estão ACTIVE, com conta de serviço dedicada e `CRM_ENFORCE_APPCHECK=true`, conforme leitura da configuração publicada em `2026-09-21T01:27:32Z`.
+- Conta proprietária recarregada após enforcement: associação reconhecida e dados comerciais carregados. Tokens App Check válidos observados no backend depois da exigência. Chamada sem autenticação/atestação retornou HTTP 401.
+- Prospecção online retornou 20 resultados do Google. Zoom alterou de 12 para 13; modo satélite selecionado e atribuição de imagens apresentada. Street View continua disponível como controle; não foi executado um roteiro completo nesse modo nesta entrega.
+- Idioma alterado para espanhol; leitura administrativa do documento de preferência confirmou `es` no Firebase. Interface retornada a inglês após o ensaio. Ordem EN/PT/ES aplicada na revisão complementar solicitada pelo usuário.
+- Gestão de registros abriu na versão online. Edição/arquivamento/restauração foram exercitados no modo local e nas transações do emulador; não foram inseridos registros comerciais fictícios na base real.
+- PITR e proteção de exclusão confirmados; cópia de restauração ausente após limpeza. A listagem de backups diários ainda estava vazia às `01:27:32Z`: o primeiro disparo é do agendamento do provedor. Recuperação pontual já foi ensaiada com sucesso.
+
+**Estado da entrega:** implementação e publicação dos três blocos técnicos concluídas. A homologação da equipe com contas reais descrita acima continua dependente das identidades e do login dos respectivos usuários. Não é necessário trocar de modelo para usar a aplicação; não confundir essa pendência humana com módulo ainda não desenvolvido.
 
 ## Continuidade
 

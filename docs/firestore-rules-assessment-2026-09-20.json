@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Avaliação das regras Firestore versionadas, sem garantia sobre componentes fora desse escopo. Criação, atualização e exclusão diretas são negadas em todas as coleções. Autoridade vem da associação persistida, não de campos enviados pelo cliente. Leitura administrativa exige associação ativa, papel, módulo e ausência de bloqueio explícito; cada usuário pode consultar sua própria associação. Dados comerciais, histórico, preferências e limites são acessados por Functions autenticadas que validam escopo e conteúdo. Limites de tamanho e tipos de escrita são responsabilidade desses handlers, pois as regras não autorizam escrita do cliente. Dez testes de regras aprovados, complementados por testes de políticas e transações. Não foi identificada vulnerabilidade nas regras examinadas; homologação com usuários reais permanece distinta desse resultado.",
+  "findings": []
+}

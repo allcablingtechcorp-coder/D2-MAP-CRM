@@ -121,7 +121,7 @@ export function AppShell({
           <strong className="topbar-title">{t(`nav.${activeModule}` as TranslationKey)}</strong>
           <div className="topbar-actions">
             <div className="language-switcher" role="group" aria-label={t("language.label")}>
-              {(["pt", "en", "es"] as Locale[]).map((language) => (
+              {(["en", "pt", "es"] as Locale[]).map((language) => (
                 <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language} title={t(`language.${language}` as TranslationKey)}>
                   <LanguageFlag locale={language} />
                   <span>{language.toUpperCase()}</span>

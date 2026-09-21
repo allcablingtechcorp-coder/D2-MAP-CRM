@@ -60,7 +60,9 @@ A execução local utiliza Node 24. O backend de produção e a integração con
 - Layout de relatórios inspecionado em desktop e largura móvel de 390 px; bandeiras e navegação preservadas.
 - Dados de teste usados no emulador e no modo demonstrativo local; sem criação de vendedores ou registros comerciais fictícios no workspace real.
 
-## O que ainda não está concluído
+## O que ainda não estava concluído nesta auditoria
+
+Atualização posterior: os três blocos técnicos abaixo foram implementados e publicados na entrega seguinte. Consultar [Entrega operacional de 20/09/2026](ENTREGA_OPERACIONAL_2026-09-20.md) para as evidências atuais e a pendência de homologação com contas reais. O conteúdo abaixo é o registro histórico anterior à correção.
 
 ### 1. Ciclo completo de manutenção comercial
 

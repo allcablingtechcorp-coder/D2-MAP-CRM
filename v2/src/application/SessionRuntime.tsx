@@ -121,7 +121,7 @@ type SessionScreenState = "loading" | "signed_out" | "membership_required" | "ac
 
 function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
-  return <div className="language-switcher" role="group" aria-label={t("language.label")}>{(["pt", "en", "es"] as Locale[]).map((language) => <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language}><LanguageFlag locale={language} /><span>{language.toUpperCase()}</span></button>)}</div>;
+  return <div className="language-switcher" role="group" aria-label={t("language.label")}>{(["en", "pt", "es"] as Locale[]).map((language) => <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language}><LanguageFlag locale={language} /><span>{language.toUpperCase()}</span></button>)}</div>;
 }
 
 function SessionScreen({ state, identity, onPrimaryAction, onSecondaryAction, busy = false, error = false }: { state: SessionScreenState; identity?: AuthIdentity; onPrimaryAction?: () => void; onSecondaryAction?: () => void; busy?: boolean; error?: boolean }) {
