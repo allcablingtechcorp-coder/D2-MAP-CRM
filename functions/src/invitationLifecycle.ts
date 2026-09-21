@@ -5,8 +5,8 @@ import { GROUP_ID, companyIds } from "./companyWorkspaces.js";
 import { canManageMemberships, parseMembershipDocument } from "./membershipPolicy.js";
 import { parseCreateInvitationCommand } from "./governancePolicy.js";
 import { exact, id, object } from "./lifecyclePolicy.js";
-import { consumeRequestBudget, crmCallableOptions } from "./requestProtection.js";
-import { sendAccessEmail } from "./emailDelivery.js";
+import { consumeRequestBudget } from "./requestProtection.js";
+import { sendAccessEmail, emailCallableOptions } from "./emailDelivery.js";
 
 const root = () => getFirestore().doc(`organizations/${GROUP_ID}`);
 const live = (d: FirebaseFirestore.DocumentData) => d.status === "pending" && !d.archivedAt && d.expiresAt instanceof Timestamp && d.expiresAt.toMillis() > Date.now() && Array.isArray(d.companyIds) && d.companyIds.length > 0;
@@ -23,10 +23,10 @@ export async function deliverInvitation(invitationId:string, uid:string) {
     const day=new Date().toISOString().slice(0,10), count=data.delivery?.day===day?Number(data.delivery?.count??0):0;
     if(count>=10)throw new HttpsError("resource-exhausted","Daily invitation email limit reached");
     tx.update(ref,{delivery:{status:"sending",attemptId,attemptedAt:now,day,count:count+1}});
-    return {email:String(data.email),locale:String(data.locale??"en"),actorEmail:String(actor.data()!.email)};
+    return {email:String(data.email),locale:String(data.locale??"en"),actorEmail:String(actor.data()!.email),context:{kind:"invitation" as const,companyIds:data.companyIds as string[],role:String(data.role),scope:String(data.scope),expiresAt:(data.expiresAt as Timestamp).toMillis()}};
   });
   let status:"provider_accepted"|"failed"="provider_accepted";
-  try {await sendAccessEmail(target.email,target.locale);} catch {status="failed";}
+  try {await sendAccessEmail(target.email,target.locale,target.context);} catch {status="failed";}
   await db.runTransaction(async tx=>{
     const snapshot=await tx.get(ref);
     if(snapshot.data()?.delivery?.attemptId!==attemptId)return;
@@ -36,7 +36,7 @@ export async function deliverInvitation(invitationId:string, uid:string) {
   return {status};
 }
 
-export const manageInvitation=onCall(crmCallableOptions,async request=>{
+export const manageInvitation=onCall(emailCallableOptions,async request=>{
   if(!request.auth)throw new HttpsError("unauthenticated","Sign in required");
   const uid=request.auth.uid;await consumeRequestBudget(uid);
   const input=object(request.data);exact(input,["action","invitationId","patch"]);
@@ -74,7 +74,7 @@ export const manageInvitation=onCall(crmCallableOptions,async request=>{
 });
 
 // Generic response prevents revealing whether an email is invited/registered.
-export const requestEmailAccess=onCall(crmCallableOptions,async request=>{
+export const requestEmailAccess=onCall(emailCallableOptions,async request=>{
   const input=object(request.data);exact(input,["email","locale"]);
   const email=typeof input.email==="string"?input.email.trim().toLowerCase():"";
   if(email.length>254||!/^\S+@\S+\.\S+$/.test(email))throw new HttpsError("invalid-argument","Valid email required");
@@ -90,7 +90,9 @@ export const requestEmailAccess=onCall(crmCallableOptions,async request=>{
   const [members,invites]=await Promise.all([root().collection("memberships").where("email","==",email).limit(1).get(),root().collection("invitations").where("email","==",email).get()]);
   const member=members.docs[0]?.data();
   if(member?member.status==="active"&&Array.isArray(member.companyIds)&&member.companyIds.length:invites.docs.some(d=>live(d.data()))) {
-    try{await sendAccessEmail(email,typeof input.locale==="string"?input.locale:"en");}catch{throw new HttpsError("unavailable","Email service unavailable. Try again later");}
+    const invitation=invites.docs.find(d=>live(d.data()))?.data();
+    const context=member?{kind:"signin" as const,companyIds:member.companyIds as string[]}:{kind:"invitation" as const,companyIds:invitation!.companyIds as string[],role:String(invitation!.role),scope:String(invitation!.scope),expiresAt:(invitation!.expiresAt as Timestamp).toMillis()};
+    try{await sendAccessEmail(email,typeof input.locale==="string"?input.locale:"en",context);}catch{throw new HttpsError("unavailable","Email service unavailable. Try again later");}
   }
   return {requested:true};
 });

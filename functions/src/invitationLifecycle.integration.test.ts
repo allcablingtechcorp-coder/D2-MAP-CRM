@@ -2,7 +2,7 @@ import {beforeAll,beforeEach,describe,it,expect,vi} from "vitest";
 import {getFirestore,Timestamp} from "firebase-admin/firestore";
 import type {CallableRequest} from "firebase-functions/v2/https";
 import {sendAccessEmail} from "./emailDelivery.js";
-vi.mock("./emailDelivery.js",()=>({sendAccessEmail:vi.fn().mockResolvedValue(undefined)}));
+vi.mock("./emailDelivery.js",async importOriginal=>({...await importOriginal<typeof import("./emailDelivery.js")>(),sendAccessEmail:vi.fn().mockResolvedValue(undefined)}));
 const enabled=!!process.env.FIRESTORE_EMULATOR_HOST&&process.env.GCLOUD_PROJECT==="demo-d2-map-crm";
 describe.skipIf(!enabled)("email invitation lifecycle",()=>{
  let api:typeof import("./index.js");const root=()=>getFirestore().doc("organizations/d2-group");
@@ -20,7 +20,7 @@ describe.skipIf(!enabled)("email invitation lifecycle",()=>{
   await root().collection("memberships").doc("mail-admin").set({email:"mail-admin@example.test",displayName:"Admin",role:"operations_admin",status:"active",scope:"organization",modules:["admin"],companyIds:["d2-hvac-solutions"]});
  });
  it("automatically sends an access email and accepts a verified non-Google identity only for invited companies",async()=>{
-  const result=await create();expect(result.invitation.deliveryStatus).toBe("provider_accepted");expect(sendAccessEmail).toHaveBeenCalledWith("invited@example.test","en");
+  const result=await create();expect(result.invitation.deliveryStatus).toBe("provider_accepted");expect(sendAccessEmail).toHaveBeenCalledWith("invited@example.test","en",expect.objectContaining({kind:"invitation",companyIds:["d2-hvac-solutions"]}));
   await expect(api.acceptGovernanceInvitation.run(q("invited",{organizationId:"d2-group"},{email_verified:false}))).rejects.toMatchObject({code:"failed-precondition"});
   expect(await api.acceptGovernanceInvitation.run(q("invited",{organizationId:"d2-group"}))).toEqual({accepted:true});
   expect((await root().collection("memberships").doc("invited").get()).data()?.companyIds).toEqual(["d2-hvac-solutions"]);
@@ -64,7 +64,7 @@ describe.skipIf(!enabled)("email invitation lifecycle",()=>{
   await create();vi.mocked(sendAccessEmail).mockClear();
   const unauth=(email:string)=>({data:{email,locale:"pt"},rawRequest:{ip:"127.0.0.2"}}) as CallableRequest;
   expect(await api.requestEmailAccess.run(unauth("unknown@example.test"))).toEqual({requested:true});expect(sendAccessEmail).not.toHaveBeenCalled();
-  await api.requestEmailAccess.run(unauth("invited@example.test"));expect(sendAccessEmail).toHaveBeenCalledWith("invited@example.test","pt");
+  await api.requestEmailAccess.run(unauth("invited@example.test"));expect(sendAccessEmail).toHaveBeenCalledWith("invited@example.test","pt",expect.objectContaining({kind:"invitation",companyIds:["d2-hvac-solutions"]}));
   for(let i=0;i<4;i++)await api.requestEmailAccess.run(unauth("invited@example.test"));
   await expect(api.requestEmailAccess.run(unauth("invited@example.test"))).rejects.toMatchObject({code:"resource-exhausted"});
  });

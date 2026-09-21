@@ -1,7 +1,7 @@
 import {beforeAll,beforeEach,describe,it,expect,vi} from "vitest";
 import {getFirestore} from "firebase-admin/firestore";
 import type {CallableRequest} from "firebase-functions/v2/https";
-vi.mock("./emailDelivery.js",()=>({sendAccessEmail:vi.fn().mockResolvedValue(undefined)}));
+vi.mock("./emailDelivery.js",async importOriginal=>({...await importOriginal<typeof import("./emailDelivery.js")>(),sendAccessEmail:vi.fn().mockResolvedValue(undefined)}));
 const enabled=!!process.env.FIRESTORE_EMULATOR_HOST&&process.env.GCLOUD_PROJECT==="demo-d2-map-crm";
 describe.skipIf(!enabled)("company isolation in the Firestore emulator",()=>{
  let api:typeof import("./index.js");

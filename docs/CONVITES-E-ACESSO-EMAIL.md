@@ -2,6 +2,8 @@
 
 Atualização de 21/09/2026. Aplicativo: https://allcablingtechcorp-coder.github.io/D2-MAP-CRM/
 
+O histórico abaixo descreve o envio nativo já validado. A implementação do remetente próprio e do convite com logos está documentada em [E-mails com marca D2](EMAILS-COM-MARCA-D2.md); sua ativação depende da configuração segura da caixa de envio.
+
 ## O que mudou
 
 Anteriormente, criar um convite apenas gravava a autorização no CRM. Não havia envio automático de e-mail. Esta versão envia um link de entrada pelo Firebase Authentication e oferece acesso com qualquer endereço de e-mail, sem exigir conta Google. O login Google continua disponível.
