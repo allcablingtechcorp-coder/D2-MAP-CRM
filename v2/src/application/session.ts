@@ -19,6 +19,9 @@ export interface AuthGateway {
   observeIdentity(listener: (identity: AuthIdentity | null) => void): () => void;
   signInWithGoogle(): Promise<AuthIdentity>;
   signOut(): Promise<void>;
+  isEmailLink?(): boolean;
+  requestEmailLink?(email:string,locale:string):Promise<void>;
+  completeEmailLink?(email:string):Promise<void>;
 }
 
 export interface MembershipRepository {
@@ -30,6 +33,7 @@ export interface MembershipRepository {
   listGovernanceDirectory(): Promise<{ invitations: Invitation[]; teams: Team[] }>;
   createInvitation(input: InvitationInput & { teamIds: string[] }): Promise<Invitation>;
   createTeam(name: string): Promise<Team>;
+  manageInvitation?(action:"resend"|"renew"|"delete",invitationId:string,patch?:Pick<InvitationInput,"role"|"scope"|"modules"|"companyIds">):Promise<void>;
   acceptInvitation(): Promise<boolean>;
   recordSessionEvent(event: "signed_in" | "access_denied"): Promise<void>;
 }

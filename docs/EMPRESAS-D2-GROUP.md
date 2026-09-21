@@ -36,11 +36,13 @@ Ao conceder uma empresa pela primeira vez a um usuário existente, o sistema usa
 
 ## Convites
 
-O formulário de convite exige selecionar uma ou duas empresas, além do e-mail, cargo, escopo e módulos. A criação não envia e-mail automaticamente. Compartilhe o endereço do CRM com a pessoa, que entra com a conta Google correspondente e aceita o convite.
+O formulário de convite exige selecionar uma ou duas empresas, além do e-mail, cargo, escopo e módulos. A criação envia um link de acesso por e-mail pelo Firebase Authentication. A pessoa pode usar qualquer provedor de e-mail, sem precisar de conta Google ou senha. A entrada com Google continua disponível como alternativa.
 
 O convite vale por sete dias. A aceitação exige e-mail verificado e cria os vínculos selecionados em uma transação. Equipes são configuradas depois, dentro de cada empresa. A configuração inicial de cargo e módulos vale para todas as empresas selecionadas; depois pode ser diferenciada.
 
-Convites antigos sem empresa definida são exibidos como expirados e não concedem acesso automaticamente. Devem ser renovados pelo super admin escolhendo explicitamente as empresas. Usuários já cadastrados recebem novas empresas pelo painel de acesso, não por um segundo convite.
+Convites antigos sem empresa definida são identificados como **Select companies to renew / Selecione empresas para renovar** e não concedem acesso automaticamente. Devem ser renovados pelo super admin escolhendo explicitamente as empresas. Usuários já cadastrados recebem novas empresas pelo painel de acesso, não por um segundo convite.
+
+O super admin pode **reenviar o e-mail**, **renovar/editar** empresas e permissões, ou **excluir** o convite da lista. A exclusão invalida convites ainda não aceitos e preserva a auditoria. Não revoga o acesso de uma pessoa que já aceitou: nesse caso, use Usuários/Acesso por empresa. Consulte [Convites e acesso por e-mail](CONVITES-E-ACESSO-EMAIL.md) para o procedimento completo.
 
 ## Relatórios e logos
 
