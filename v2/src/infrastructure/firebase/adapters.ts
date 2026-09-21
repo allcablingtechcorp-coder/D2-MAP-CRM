@@ -1,4 +1,4 @@
-import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions } from "../../application/commercial";
+import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions, ProspectVisitInput } from "../../application/commercial";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
@@ -64,12 +64,17 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   ) {}
 
   observeByUid(uid: string, listener: (membership: Membership | null) => void, onError: () => void): () => void {
-    return onSnapshot(doc(this.database, "organizations", this.organizationId, "memberships", uid), { includeMetadataChanges: true }, (snapshot) => {
-      // A cached active membership must not authorize an offline session.
-      if (snapshot.metadata.fromCache) { onError(); return; }
+    const initialTimeout = window.setTimeout(onError, 20000);
+    const unsubscribe = onSnapshot(doc(this.database, "organizations", this.organizationId, "memberships", uid), { includeMetadataChanges: true }, (snapshot) => {
+      // Cache metadata is not an authentication failure. Wait for the initial
+      // server confirmation; after that, retain the screen during reconnection.
+      // All mutations still validate current membership on the server.
+      if (snapshot.metadata.fromCache) return;
+      window.clearTimeout(initialTimeout);
       try { listener(snapshot.exists() ? membershipFromDocument(snapshot.id, snapshot.data()) : null); }
       catch { onError(); }
-    }, onError);
+    }, () => { window.clearTimeout(initialTimeout); onError(); });
+    return () => { window.clearTimeout(initialTimeout); unsubscribe(); };
   }
 
   async findByUid(uid: string): Promise<Membership | null> {
@@ -195,6 +200,9 @@ export class FirebaseCommercialRepository implements CommercialRepository {
   }
   async changeRecord(input: RecordChange) {
     await httpsCallable(this.functions, "changeCommercialRecord")({ organizationId: this.organizationId, ...input });
+  }
+  async saveProspectingVisit(input: ProspectVisitInput) {
+    return (await httpsCallable<unknown, { leadId: string; activityId: string | null }>(this.functions,"saveProspectingVisit")({organizationId:this.organizationId,...input})).data;
   }
   async assignmentOptions(): Promise<AssignmentOptions> {
     const result: AssignmentOptions = { members: [], teams: [], canAssign: false };

@@ -4,6 +4,8 @@ export type OpportunityStage = "discovery" | "diagnosis" | "proposal" | "negotia
 export type ActivityKind = "call" | "email" | "meeting" | "visit" | "note";
 
 export interface Lead extends RecordMetadata {
+  placeId?: string;
+  position?: { lat: number; lng: number };
   id: string;
   companyName: string;
   location: string;
@@ -37,6 +39,9 @@ export interface Activity extends RecordMetadata {
   dueAt: string;
   completed: boolean;
   completedAt?: string;
+  completedByUid?: string;
+  completedByName?: string;
+  visitNote?: string;
 }
 
 export interface Company extends RecordMetadata {

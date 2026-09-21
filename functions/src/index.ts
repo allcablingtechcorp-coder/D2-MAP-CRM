@@ -546,7 +546,7 @@ export const completeCommercialActivity = onCall(callableOptions, async (request
     const data = snapshot.data()!; requireRecordAccess(actor, request.auth!.uid, data);
     if (data.archived === true) throw new HttpsError("failed-precondition", "Restore the record first");
     if (data.completed === true) { result = serializeActivity({ id: snapshot.id, data }); return; }
-    transaction.update(reference, { completed: true, completedAt: FieldValue.serverTimestamp(), updatedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
+    transaction.update(reference, { completed: true, completedAt: FieldValue.serverTimestamp(), completedByUid: request.auth!.uid, completedByName: actor.displayName, updatedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, actor.email, "commercial.activity_completed", "activity", input.recordId, "Activity completed");
     transaction.create(audit.reference, audit.data);
     transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
@@ -556,3 +556,5 @@ export const completeCommercialActivity = onCall(callableOptions, async (request
 });
 
 export { loadCommercialPage, changeCommercialRecord, listAssignmentOptions, commercialRecordHistory, userPreferences } from "./commercialLifecycle.js";
+
+export { saveProspectingVisit } from "./prospectingVisits.js";

@@ -8,7 +8,7 @@ export function dateIso(value: unknown): string {
 
 export function serializeLead(document: { id: string; data: DocumentData }) {
   const data = document.data;
-  return { ...recordMetadata(data), id: document.id, companyName: String(data.companyName ?? ""), location: String(data.location ?? ""), ownerName: String(data.ownerName ?? ""), qualification: String(data.qualification ?? "new"), source: String(data.source ?? "manual"), priority: String(data.priority ?? "medium"), nextAction: String(data.nextAction ?? ""), nextActionAt: dateIso(data.nextActionAt), lastActivityAt: dateIso(data.lastActivityAt) };
+  return { ...recordMetadata(data), id: document.id, ...(typeof data.placeId === "string" ? { placeId: data.placeId } : {}), ...(data.position && typeof data.position.lat === "number" && typeof data.position.lng === "number" ? { position: data.position } : {}), companyName: String(data.companyName ?? ""), location: String(data.location ?? ""), ownerName: String(data.ownerName ?? ""), qualification: String(data.qualification ?? "new"), source: String(data.source ?? "manual"), priority: String(data.priority ?? "medium"), nextAction: String(data.nextAction ?? ""), nextActionAt: dateIso(data.nextActionAt), lastActivityAt: dateIso(data.lastActivityAt) };
 }
 
 export function serializeOpportunity(document: { id: string; data: DocumentData }) {
@@ -18,7 +18,7 @@ export function serializeOpportunity(document: { id: string; data: DocumentData 
 
 export function serializeActivity(document: { id: string; data: DocumentData }) {
   const data = document.data;
-  return { ...recordMetadata(data), id: document.id, kind: String(data.kind ?? "note"), subject: String(data.subject ?? ""), companyName: String(data.companyName ?? ""), ownerName: String(data.ownerName ?? ""), dueAt: dateIso(data.dueAt), completedAt: data.completedAt ? dateIso(data.completedAt) : "", completed: data.completed === true };
+  return { ...recordMetadata(data), id: document.id, kind: String(data.kind ?? "note"), subject: String(data.subject ?? ""), companyName: String(data.companyName ?? ""), ownerName: String(data.ownerName ?? ""), dueAt: dateIso(data.dueAt), completedAt: data.completedAt ? dateIso(data.completedAt) : "", completedByUid: String(data.completedByUid ?? ""), completedByName: String(data.completedByName ?? ""), visitNote: String(data.visitNote ?? ""), completed: data.completed === true };
 }
 
 export function serializeCompany(document: { id: string; data: DocumentData }) {

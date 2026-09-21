@@ -1,4 +1,4 @@
-import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions } from "./commercial";
+import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions, ProspectVisitInput } from "./commercial";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { demoActivities, demoCompanies, demoContacts, demoLeads, demoOpportunities } from "../data/demo";
 import type { Activity, Company, Contact, Lead, Opportunity, OpportunityStage } from "../domain/crm";
@@ -10,6 +10,7 @@ import { completeActivity as completeLocalActivity, createLead as createLocalLea
 import type { CommercialRepository, CommercialWorkspaceSnapshot } from "./commercial";
 
 interface CrmWorkspaceValue extends CommercialWorkspaceSnapshot {
+  saveProspectingVisit: (input: ProspectVisitInput) => Promise<void>;
   loading: boolean;
   records: CommercialWorkspaceSnapshot;
   changeRecord: (input: RecordChange) => Promise<void>;
@@ -75,6 +76,19 @@ function DemoWorkspace({ children, storageKey }: { children: ReactNode; storageK
     refresh: async () => {},
     assignmentOptions: async () => ({ members: [{ uid: "demo", name: "Dante Frota", teamIds: [] }], teams: [], canAssign: true }),
     history: async () => [],
+    saveProspectingVisit: async (input) => {
+      setSnapshot(state => {
+        const existing = state.leads.find(lead => lead.placeId === input.placeId || lead.id === input.leadId);
+        const leadId = existing?.id ?? `map-${input.placeId}`, companyId = existing?.companyId ?? leadId;
+        const now = new Date().toISOString(), at = input.at ?? now;
+        const lead: Lead = { id:leadId, companyId, companyName:input.name, location:input.location, ownerName:"Dante Frota", qualification:"new", source:"map", priority:"medium", nextAction:"", nextActionAt:at, lastActivityAt:now, ...existing, placeId:input.placeId, position:input.position };
+        const company: Company = {id:companyId,name:input.name,location:input.location,ownerName:lead.ownerName,industry:"",website:"",phone:"",createdAt:now};
+        const activityId = input.activityId ?? input.requestId;
+        const old = state.activities.find(a=>a.id===activityId);
+        const activity: Activity = { id:activityId,companyId,companyName:input.name,ownerName:"Dante Frota",kind:"visit",subject:input.note || input.name,dueAt:at,...old,completed:input.action === "complete",...(input.action === "complete" ? {completedAt:at,completedByName:"Dante Frota"} : {}),visitNote:input.note ?? "" };
+        return {...state,leads:[lead,...state.leads.filter(l=>l.id!==leadId)],companies:state.companies.some(c=>c.id===companyId)?state.companies:[company,...state.companies],activities:input.action === "save"?state.activities:[activity,...state.activities.filter(a=>a.id!==activityId)]};
+      });
+    },
     changeRecord: async (input) => {
       setSnapshot((state) => ({ ...state, [input.collection]: state[input.collection].map((item) => item.id !== input.recordId ? item : { ...item, ...(input.patch ?? {}), ...(input.action === "archive" ? { archived: true } : input.action === "restore" ? { archived: false } : input.action === "reopen" ? { stage: "discovery" } : input.action === "reassign" ? { ownerUid: input.ownerUid, teamId: input.teamId, ownerName: "Dante Frota" } : {}), revision: String(Date.now()) }) }));
     },
@@ -143,6 +157,7 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
 
   const value = useMemo<CrmWorkspaceValue>(() => ({
     ...visibleSnapshot(snapshot), records: snapshot, loading, can: allowed,
+    saveProspectingVisit: async input => { await repository.saveProspectingVisit(input); setSnapshot(await repository.load()); },
     refresh: async () => { setSnapshot(await repository.load()); },
     assignmentOptions: () => repository.assignmentOptions(),
     history: (collection, recordId) => repository.history(collection, recordId),

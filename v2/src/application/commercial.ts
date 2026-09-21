@@ -10,6 +10,7 @@ export interface CommercialWorkspaceSnapshot {
 }
 
 export interface CommercialRepository {
+  saveProspectingVisit(input: ProspectVisitInput): Promise<{ leadId: string; activityId: string | null }>;
   changeRecord(input: RecordChange): Promise<void>;
   assignmentOptions(): Promise<AssignmentOptions>;
   history(collection: RecordCollection, recordId: string): Promise<RecordEvent[]>;
@@ -22,6 +23,20 @@ export interface CommercialRepository {
   completeActivity(id: string): Promise<Activity>;
   createCompany(input: Omit<Company, "id" | "ownerName" | "createdAt">): Promise<Company>;
   createContact(input: Omit<Contact, "id" | "ownerName" | "createdAt" | "companyName">): Promise<Contact>;
+}
+
+export interface ProspectVisitInput {
+  requestId: string;
+  action: "save" | "plan" | "complete";
+  placeId: string;
+  name: string;
+  location: string;
+  position: { lat: number; lng: number };
+  leadId?: string;
+  activityId?: string;
+  at?: string;
+  note?: string;
+  teamId?: string | null;
 }
 
 export type RecordCollection = keyof CommercialWorkspaceSnapshot;
