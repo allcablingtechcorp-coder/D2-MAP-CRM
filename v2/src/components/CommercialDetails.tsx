@@ -11,8 +11,8 @@ export function CommercialDetails({ lead, onClose }: { lead: Lead; onClose: () =
   const { activities, opportunities, can } = useCrmWorkspace();
   const [activityOpen, setActivityOpen] = useState(false);
   const [opportunityOpen, setOpportunityOpen] = useState(false);
-  const relatedActivities = activities.filter((item) => item.companyName === lead.companyName).sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime());
-  const relatedOpportunities = opportunities.filter((item) => item.companyName === lead.companyName);
+  const relatedActivities = activities.filter((item) => !!lead.companyId && item.companyId === lead.companyId).sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime());
+  const relatedOpportunities = opportunities.filter((item) => !!lead.companyId && item.companyId === lead.companyId);
   const openOpportunities = relatedOpportunities.filter((item) => openStages.includes(item.stage));
   const openValue = openOpportunities.reduce((sum, item) => sum + (item.amountCents ?? 0), 0);
 
@@ -28,7 +28,7 @@ export function CommercialDetails({ lead, onClose }: { lead: Lead; onClose: () =
         <section className="drawer-section"><header><div><span>{t("details.timeline")}</span><h3>{t("details.history")}</h3></div><strong>{relatedActivities.length}</strong></header>{relatedActivities.length ? <div className="timeline-list">{relatedActivities.map((item) => <article key={item.id}><span className={`timeline-icon ${item.kind}`}><Activity size={15} /></span><div><strong>{item.subject}</strong><span>{t(`activity.${item.kind}` as TranslationKey)} • {item.ownerName}</span><small>{formatDateTime(item.dueAt)}</small></div><i className={item.completed ? "complete" : "pending"}>{t(item.completed ? "details.completed" : "details.pending")}</i></article>)}</div> : <p className="empty-detail">{t("details.noActivities")}</p>}</section>
       </div>
     </aside>
-    {activityOpen && <ActivityDialog preset={{ companyName: lead.companyName, ownerName: lead.ownerName }} onClose={() => setActivityOpen(false)} />}
-    {opportunityOpen && <OpportunityDialog preset={{ companyName: lead.companyName, ownerName: lead.ownerName }} onClose={() => setOpportunityOpen(false)} />}
+    {activityOpen && <ActivityDialog preset={{ companyId: lead.companyId, companyName: lead.companyName, ownerName: lead.ownerName }} onClose={() => setActivityOpen(false)} />}
+    {opportunityOpen && <OpportunityDialog preset={{ companyId: lead.companyId, companyName: lead.companyName, ownerName: lead.ownerName }} onClose={() => setOpportunityOpen(false)} />}
   </div>;
 }

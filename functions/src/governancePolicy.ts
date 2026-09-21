@@ -22,17 +22,17 @@ function identifier(value: unknown, name: string): string {
 }
 
 function identifiers(value: unknown, name: string): string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item))) throw new InputValidationError(`${name} is invalid`);
+  if (!Array.isArray(value) || value.length > 100 || value.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item))) throw new InputValidationError(`${name} is invalid`);
   return [...new Set(value)];
 }
 
 export function parseCreateInvitationCommand(value: unknown): CreateInvitationCommand {
   const input = record(value, ["organizationId", "email", "role", "scope", "modules", "teamIds"]);
   const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputValidationError("email is invalid");
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputValidationError("email is invalid");
   if (typeof input.role !== "string" || !roles.includes(input.role as RoleId) || input.role === "owner") throw new InputValidationError("role is invalid");
   if (typeof input.scope !== "string" || !scopes.includes(input.scope as AccessScope) || input.scope === "custom") throw new InputValidationError("scope is invalid");
-  if (!Array.isArray(input.modules) || input.modules.length === 0 || input.modules.some((item) => typeof item !== "string" || !modules.includes(item as ModuleId))) throw new InputValidationError("modules are invalid");
+  if (!Array.isArray(input.modules) || input.modules.length === 0 || input.modules.length > 8 || input.modules.some((item) => typeof item !== "string" || !modules.includes(item as ModuleId))) throw new InputValidationError("modules are invalid");
   const teamIds = identifiers(input.teamIds, "teamIds");
   if (input.scope === "assigned_teams" && teamIds.length === 0) throw new InputValidationError("teamIds requires at least one team for assigned_teams scope");
   return { organizationId: identifier(input.organizationId, "organizationId"), email, role: input.role as Exclude<RoleId, "owner">, scope: input.scope as Exclude<AccessScope, "custom">, modules: [...new Set(input.modules as ModuleId[])], teamIds };

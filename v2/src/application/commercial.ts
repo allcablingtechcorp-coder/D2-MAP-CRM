@@ -10,6 +10,10 @@ export interface CommercialWorkspaceSnapshot {
 }
 
 export interface CommercialRepository {
+  changeRecord(input: RecordChange): Promise<void>;
+  assignmentOptions(): Promise<AssignmentOptions>;
+  history(collection: RecordCollection, recordId: string): Promise<RecordEvent[]>;
+  preferences(locale?: string): Promise<{ locale: string | null }>;
   load(): Promise<CommercialWorkspaceSnapshot>;
   createLead(input: LeadInput): Promise<LeadCreationResult>;
   createActivity(input: Omit<Activity, "id" | "completed">): Promise<Activity>;
@@ -19,3 +23,18 @@ export interface CommercialRepository {
   createCompany(input: Omit<Company, "id" | "ownerName" | "createdAt">): Promise<Company>;
   createContact(input: Omit<Contact, "id" | "ownerName" | "createdAt" | "companyName">): Promise<Contact>;
 }
+
+export type RecordCollection = keyof CommercialWorkspaceSnapshot;
+export type CommercialRecord = Lead | Company | Contact | Activity | Opportunity;
+export interface RecordChange {
+  collection: RecordCollection;
+  recordId: string;
+  revision: string;
+  action: "edit" | "archive" | "restore" | "reassign" | "reopen";
+  reason: string;
+  patch?: Record<string, unknown>;
+  ownerUid?: string;
+  teamId?: string | null;
+}
+export interface AssignmentOptions { members: { uid: string; name: string; teamIds: string[] }[]; teams: { id: string; name: string }[]; canAssign: boolean; }
+export interface RecordEvent { id: string; action: string; actor: string; reason: string; at: string; }

@@ -1,10 +1,11 @@
 export type Locale = "pt" | "en" | "es";
 
 const pt = {
+  "admin.auditCommercialChanged": "Registro comercial alterado",
   "audit.googleRating": "Avaliação no Google",
   "audit.mapResults": "{count} resultados do Google",
   "audit.mapSorted": "Ordenados pela avaliação no Google",
-  "audit.capacityError": "O espaço ultrapassou o limite atual de 500 registros por consulta de escopo. Nenhum total parcial será exibido. Solicite ao administrador um escopo menor; a paginação é necessária para carteiras maiores.",
+  "audit.capacityError": "Muitas solicitações em um minuto. Aguarde um minuto e tente novamente; nenhum total parcial será exibido.",
   "audit.retry": "Tentar novamente",
   "audit.dashboardTitle": "Visão comercial",
   "audit.winRate": "Taxa de ganho",
@@ -53,10 +54,11 @@ type Catalog = Record<TranslationKey, string>;
 
 const en: Catalog = {
   ...pt,
+  "admin.auditCommercialChanged": "Commercial record changed",
   "audit.googleRating": "Google rating",
   "audit.mapResults": "{count} Google results",
   "audit.mapSorted": "Sorted by Google rating",
-  "audit.capacityError": "The workspace exceeded the current limit of 500 records per scope query. Partial totals will not be shown. Ask the administrator for a narrower scope; larger workspaces require pagination.",
+  "audit.capacityError": "Too many requests in one minute. Wait a minute and retry; partial totals are never displayed.",
   "audit.retry": "Retry",
   "audit.dashboardTitle": "Sales overview",
   "audit.winRate": "Win rate",
@@ -102,10 +104,11 @@ const en: Catalog = {
 
 const es: Catalog = {
   ...pt,
+  "admin.auditCommercialChanged": "Registro comercial modificado",
   "audit.googleRating": "Calificación en Google",
   "audit.mapResults": "{count} resultados de Google",
   "audit.mapSorted": "Ordenados por calificación en Google",
-  "audit.capacityError": "El espacio superó el límite actual de 500 registros por consulta de alcance. No se mostrarán totales parciales. Solicite un alcance menor; las carteras mayores requieren paginación.",
+  "audit.capacityError": "Demasiadas solicitudes en un minuto. Espere un minuto y vuelva a intentar; no se muestran totales parciales.",
   "audit.retry": "Reintentar",
   "audit.dashboardTitle": "Resumen comercial",
   "audit.winRate": "Tasa de éxito",

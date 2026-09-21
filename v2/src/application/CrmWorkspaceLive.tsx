@@ -1,3 +1,4 @@
+import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions } from "./commercial";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { demoActivities, demoCompanies, demoContacts, demoLeads, demoOpportunities } from "../data/demo";
 import type { Activity, Company, Contact, Lead, Opportunity, OpportunityStage } from "../domain/crm";
@@ -10,6 +11,11 @@ import type { CommercialRepository, CommercialWorkspaceSnapshot } from "./commer
 
 interface CrmWorkspaceValue extends CommercialWorkspaceSnapshot {
   loading: boolean;
+  records: CommercialWorkspaceSnapshot;
+  changeRecord: (input: RecordChange) => Promise<void>;
+  assignmentOptions: () => Promise<AssignmentOptions>;
+  history: (collection: RecordCollection, recordId: string) => Promise<RecordEvent[]>;
+  refresh: () => Promise<void>;
   can: (permission: Permission) => boolean;
   createLead: (input: LeadInput) => Promise<LeadCreationResult>;
   advanceOpportunity: (id: string, to: OpportunityStage) => Promise<OpportunityTransitionResult | null>;
@@ -21,17 +27,28 @@ interface CrmWorkspaceValue extends CommercialWorkspaceSnapshot {
   resetDemo: () => void;
 }
 
+function visibleSnapshot(snapshot: CommercialWorkspaceSnapshot): CommercialWorkspaceSnapshot {
+  const companies = new Map(snapshot.companies.map((item) => [item.id, item.name]));
+  const active = <T extends { archived?: boolean; companyId?: string; companyName?: string }>(items: T[]) => items.filter((item) => !item.archived).map((item) => item.companyId && companies.has(item.companyId) ? { ...item, companyName: companies.get(item.companyId)! } : item);
+  const activities = active(snapshot.activities);
+  const leads = active(snapshot.leads).map((lead) => ({ ...lead, lastActivityAt: activities.filter((item) => item.companyId && item.companyId === lead.companyId && item.completed).reduce((latest, item) => item.completedAt && item.completedAt > latest ? item.completedAt : latest, lead.lastActivityAt) }));
+  return { leads, activities, companies: active(snapshot.companies), contacts: active(snapshot.contacts), opportunities: active(snapshot.opportunities) };
+}
 const emptySnapshot = (): CommercialWorkspaceSnapshot => ({ leads: [], opportunities: [], activities: [], companies: [], contacts: [] });
 const initialDemoSnapshot = (): CommercialWorkspaceSnapshot => ({ leads: demoLeads, opportunities: demoOpportunities, activities: demoActivities, companies: demoCompanies, contacts: demoContacts });
 
+function linkDemo(snapshot: CommercialWorkspaceSnapshot): CommercialWorkspaceSnapshot {
+  const link = <T extends { companyId?: string; companyName: string }>(items: T[]) => items.map((item) => { const matches = snapshot.companies.filter((company) => company.name === item.companyName); return item.companyId || matches.length !== 1 ? item : { ...item, companyId: matches[0].id }; });
+  return { ...snapshot, leads: link(snapshot.leads), activities: link(snapshot.activities), opportunities: link(snapshot.opportunities) };
+}
 function loadDemoSnapshot(storageKey: string): CommercialWorkspaceSnapshot {
   try {
     const raw = localStorage.getItem(storageKey);
-    if (!raw) return initialDemoSnapshot();
+    if (!raw) return linkDemo(initialDemoSnapshot());
     const parsed = JSON.parse(raw) as Partial<CommercialWorkspaceSnapshot>;
-    if (!Array.isArray(parsed.leads) || !Array.isArray(parsed.opportunities) || !Array.isArray(parsed.activities)) return initialDemoSnapshot();
-    return { leads: parsed.leads, opportunities: parsed.opportunities, activities: parsed.activities, companies: Array.isArray(parsed.companies) ? parsed.companies : demoCompanies, contacts: Array.isArray(parsed.contacts) ? parsed.contacts : demoContacts };
-  } catch { return initialDemoSnapshot(); }
+    if (!Array.isArray(parsed.leads) || !Array.isArray(parsed.opportunities) || !Array.isArray(parsed.activities)) return linkDemo(initialDemoSnapshot());
+    return linkDemo({ leads: parsed.leads, opportunities: parsed.opportunities, activities: parsed.activities, companies: Array.isArray(parsed.companies) ? parsed.companies : demoCompanies, contacts: Array.isArray(parsed.contacts) ? parsed.contacts : demoContacts });
+  } catch { return linkDemo(initialDemoSnapshot()); }
 }
 
 const CrmWorkspaceContext = createContext<CrmWorkspaceValue | null>(null);
@@ -54,10 +71,21 @@ function DemoWorkspace({ children, storageKey }: { children: ReactNode; storageK
   }, [snapshot, storageKey]);
 
   const value = useMemo<CrmWorkspaceValue>(() => ({
-    ...snapshot, loading: false, can: () => true,
+    ...visibleSnapshot(snapshot), records: snapshot, loading: false, can: () => true,
+    refresh: async () => {},
+    assignmentOptions: async () => ({ members: [{ uid: "demo", name: "Dante Frota", teamIds: [] }], teams: [], canAssign: true }),
+    history: async () => [],
+    changeRecord: async (input) => {
+      setSnapshot((state) => ({ ...state, [input.collection]: state[input.collection].map((item) => item.id !== input.recordId ? item : { ...item, ...(input.patch ?? {}), ...(input.action === "archive" ? { archived: true } : input.action === "restore" ? { archived: false } : input.action === "reopen" ? { stage: "discovery" } : input.action === "reassign" ? { ownerUid: input.ownerUid, teamId: input.teamId, ownerName: "Dante Frota" } : {}), revision: String(Date.now()) }) }));
+    },
     createLead: async (input) => {
       const result = createLocalLead(input, snapshot.leads, new Date(), crypto.randomUUID());
-      if (result.ok) setSnapshot((current) => ({ ...current, leads: [result.lead, ...current.leads] }));
+      if (result.ok) {
+        const existingCompany = snapshot.companies.find((company) => company.name === result.lead.companyName && company.location === result.lead.location);
+        const company: Company = existingCompany ?? { id: "company-"+result.lead.id, name: result.lead.companyName, location: result.lead.location, ownerName: result.lead.ownerName, industry: "", phone: "", website: "", createdAt: new Date().toISOString() };
+        result.lead.companyId = company.id;
+        setSnapshot((current) => ({ ...current, leads: [result.lead, ...current.leads], companies: existingCompany ? current.companies : [company,...current.companies] }));
+      }
       return result;
     },
     advanceOpportunity: async (id, to) => {
@@ -91,7 +119,7 @@ function DemoWorkspace({ children, storageKey }: { children: ReactNode; storageK
       setSnapshot((state) => ({ ...state, contacts: [contact, ...state.contacts] }));
       return contact;
     },
-    resetDemo: () => setSnapshot(initialDemoSnapshot()),
+    resetDemo: () => setSnapshot(linkDemo(initialDemoSnapshot())),
   }), [snapshot]);
 
   return <CrmWorkspaceContext.Provider value={value}>{storageError && <div className="governance-feedback error" role="alert">{t("workspace.storageError")}</div>}{children}</CrmWorkspaceContext.Provider>;
@@ -114,7 +142,11 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
   }, [repository, reload]);
 
   const value = useMemo<CrmWorkspaceValue>(() => ({
-    ...snapshot, loading, can: allowed,
+    ...visibleSnapshot(snapshot), records: snapshot, loading, can: allowed,
+    refresh: async () => { setSnapshot(await repository.load()); },
+    assignmentOptions: () => repository.assignmentOptions(),
+    history: (collection, recordId) => repository.history(collection, recordId),
+    changeRecord: async (input) => { await repository.changeRecord(input); setSnapshot(await repository.load()); },
     createLead: async (input) => {
       if (!allowed("lead.create")) return { ok: false, reason: "permission_denied" };
       setRemoteError(false);
@@ -136,7 +168,7 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
       setRemoteError(false);
       try {
         const opportunity = await repository.transitionOpportunity(id, to);
-        setSnapshot((state) => ({ ...state, opportunities: state.opportunities.map((item) => item.id === id ? opportunity : item) }));
+        setSnapshot(await repository.load());
         return { ...validation, opportunity };
       } catch { setRemoteError(true); return null; }
     },
@@ -144,8 +176,8 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
       if (!allowed("activity.create")) return;
       setRemoteError(false);
       try {
-        const activity = await repository.completeActivity(id);
-        setSnapshot((state) => ({ ...state, activities: state.activities.map((item) => item.id === id ? activity : item) }));
+        await repository.completeActivity(id);
+        setSnapshot(await repository.load());
       } catch { setRemoteError(true); }
     },
     addActivity: async (input) => {

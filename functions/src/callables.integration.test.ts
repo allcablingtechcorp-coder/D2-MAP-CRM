@@ -106,13 +106,92 @@ describe.skipIf(!enabled)("callable transactions against the Firestore emulator"
   });
 
   it("persists controlled pipeline transitions and rejects impossible stages and dates", async () => {
+    await api.createCommercialCompany.run(request("rep", { name: "Pipeline test", location: "FL", industry: "", website: "", phone: "" }));
     const data = { companyName: "Pipeline test", title: "Network", amountCents: 10000, nextAction: "Call", expectedCloseAt: "2026-10-01" };
     await expect(api.createCommercialOpportunity.run(request("rep", { ...data, expectedCloseAt: "2026-02-30" }))).rejects.toMatchObject({ code: "invalid-argument" });
     const { opportunity } = await api.createCommercialOpportunity.run(request("rep", data));
     await expect(api.transitionCommercialOpportunity.run(request("rep", { recordId: opportunity.id, stage: "won" }))).rejects.toMatchObject({ code: "failed-precondition" });
     for (const stage of ["diagnosis", "proposal", "negotiation", "won"]) await api.transitionCommercialOpportunity.run(request("rep", { recordId: opportunity.id, stage }));
     expect((await api.loadCommercialWorkspace.run(request("rep", {}))).opportunities[0]?.stage).toBe("won");
-    await expect(api.transitionCommercialOpportunity.run(request("rep", { recordId: opportunity.id, stage: "lost" }))).rejects.toMatchObject({ code: "failed-precondition" });
+    await expect(api.transitionCommercialOpportunity.run(request("rep", { recordId: opportunity.id, stage: "lost" }))).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("edits with optimistic concurrency, preserves archive history and rejects forged ownership", async () => {
+    const { company } = await api.createCommercialCompany.run(request("rep", { name: "Lifecycle", location: "FL", industry: "", website: "", phone: "" }));
+    const change = { collection: "companies", recordId: company.id, revision: company.revision, reason: "Correct contact information" };
+    await expect(api.changeCommercialRecord.run(request("rep", { ...change, action: "edit", patch: { ownerUid: "owner" } }))).rejects.toMatchObject({ code: "invalid-argument" });
+    await api.changeCommercialRecord.run(request("rep", { ...change, action: "edit", patch: { name: "Lifecycle updated", phone: "555-0100" } }));
+    await expect(api.changeCommercialRecord.run(request("rep", { ...change, action: "edit", patch: { phone: "stale" } }))).rejects.toMatchObject({ code: "aborted" });
+    const page = () => api.loadCommercialPage.run(request("rep", { collection: "companies" }));
+    let updated = (await page()).records[0]!;
+    expect(updated).toMatchObject({ id: company.id, name: "Lifecycle updated", phone: "555-0100" });
+    await api.changeCommercialRecord.run(request("rep", { ...change, revision: updated.revision, action: "archive" }));
+    updated = (await page()).records[0]!; expect(updated.archived).toBe(true);
+    await api.changeCommercialRecord.run(request("rep", { ...change, revision: updated.revision, action: "restore" }));
+    expect((await page()).records[0]!.archived).toBe(false);
+    expect((await api.commercialRecordHistory.run(request("rep", { collection: "companies", recordId: company.id }))).events).toHaveLength(4);
+    await org().collection("memberships").doc("rep").update({ role: "viewer" });
+    await expect(api.changeCommercialRecord.run(request("rep", { ...change, action: "archive" }))).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("reassigns only with authority and removes the prior user's access including history", async () => {
+    await org().collection("memberships").doc("other").set({ ...member, email: "other@example.test", displayName: "Other rep" });
+    const { company } = await api.createCommercialCompany.run(request("rep", { name: "Portfolio", location: "FL", industry: "", website: "", phone: "" }));
+    const command = { collection: "companies", recordId: company.id, revision: company.revision, action: "reassign", ownerUid: "other", teamId: null, reason: "Transfer portfolio" };
+    await expect(api.changeCommercialRecord.run(request("rep", command))).rejects.toMatchObject({ code: "permission-denied" });
+    await api.changeCommercialRecord.run(request("owner", command));
+    expect((await api.loadCommercialPage.run(request("rep", { collection: "companies" }))).records).toHaveLength(0);
+    expect((await api.loadCommercialPage.run(request("other", { collection: "companies" }))).records[0]).toMatchObject({ ownerUid: "other", ownerName: "Other rep" });
+    await expect(api.commercialRecordHistory.run(request("rep", { collection: "companies", recordId: company.id }))).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("uses company IDs for homonymous companies and refuses inaccessible relationships", async () => {
+    const first = (await api.createCommercialCompany.run(request("rep", { name: "Same name", location: "Miami", industry: "", website: "", phone: "" }))).company;
+    const second = (await api.createCommercialCompany.run(request("rep", { name: "Same name", location: "Orlando", industry: "", website: "", phone: "" }))).company;
+    const data = { companyName: "Same name", kind: "call", subject: "Only Orlando", dueAt: "2026-10-01T12:00:00.000Z" };
+    await expect(api.createCommercialActivity.run(request("rep", data))).rejects.toMatchObject({ code: "failed-precondition" });
+    const { activity } = await api.createCommercialActivity.run(request("rep", { ...data, companyId: second.id }));
+    expect(activity.companyId).toBe(second.id); expect(activity.companyId).not.toBe(first.id);
+    await org().collection("companies").doc(first.id).update({ ownerUid: "someone-else" });
+    await expect(api.changeCommercialRecord.run(request("rep", { collection: "activities", recordId: activity.id, revision: activity.revision, action: "edit", patch: { companyId: first.id }, reason: "Attempt cross account link" }))).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("requires reopen permission and preserves closed opportunity audit history", async () => {
+    const ref = org().collection("opportunities").doc("closed");
+    await ref.set({ ownerUid: "rep", title: "Closed", stage: "won", amountCents: 1000 });
+    const command = { collection: "opportunities", recordId: "closed", revision: "", action: "reopen", reason: "Customer reopened scope" };
+    await expect(api.changeCommercialRecord.run(request("rep", command))).rejects.toMatchObject({ code: "permission-denied" });
+    await api.changeCommercialRecord.run(request("owner", command));
+    expect((await ref.get()).data()?.stage).toBe("discovery");
+    expect((await ref.collection("history").get()).docs[0]?.data().changes.stage).toEqual({ before: "won", after: "discovery" });
+  });
+
+  it("paginates more than 500 records without omissions, duplicates or cross-user leaks", async () => {
+    const writer = getFirestore().bulkWriter();
+    for (let i=0;i<501;i++) writer.create(org().collection("leads").doc(`lead-${String(i).padStart(4,"0")}`), { ownerUid: "rep" });
+    writer.create(org().collection("leads").doc("private"), { ownerUid: "other" }); await writer.close();
+    const ids: string[] = []; let cursor: string | null = null;
+    do {
+      const page: Awaited<ReturnType<typeof api.loadCommercialPage.run>> = await api.loadCommercialPage.run(request("rep", { collection: "leads", cursor }));
+      ids.push(...page.records.map((item) => item.id)); cursor = page.nextCursor;
+    } while(cursor);
+    expect(ids).toHaveLength(501); expect(new Set(ids).size).toBe(501); expect(ids).not.toContain("private");
+    await org().collection("memberships").doc("rep").update({ modules: ["dashboard"] });
+    expect((await api.loadCommercialPage.run(request("rep", { collection: "contacts" }))).records).toEqual([]);
+  });
+
+  it("validates explicit team selection and keeps preferences private", async () => {
+    await org().collection("teams").doc("south").set({ name: "South" });
+    await org().collection("teams").doc("north").set({ name: "North" });
+    await org().collection("memberships").doc("rep").update({ scope: "assigned_teams", teamIds: ["south"] });
+    const data = { name: "Team company", location: "FL", industry: "", website: "", phone: "" };
+    await expect(api.createCommercialCompany.run(request("rep", { ...data, teamId: "north" }))).rejects.toMatchObject({ code: "permission-denied" });
+    expect((await api.createCommercialCompany.run(request("rep", { ...data, teamId: "south" }))).company.teamId).toBe("south");
+    expect((await api.listAssignmentOptions.run(request("rep", {}))).teams.map((team) => team.id)).toEqual(["south"]);
+    await api.userPreferences.run(request("rep", { locale: "es" }));
+    expect((await api.userPreferences.run(request("rep", {}))).locale).toBe("es");
+    expect((await api.userPreferences.run(request("owner", {}))).locale).toBe(null);
+    await expect(api.userPreferences.run(request("rep", { uid: "owner", locale: "pt" }))).rejects.toMatchObject({ code: "invalid-argument" });
   });
 
   it("refuses a partial workspace instead of returning misleading truncated report totals", async () => {
