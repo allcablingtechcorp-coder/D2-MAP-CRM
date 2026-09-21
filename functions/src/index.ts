@@ -1,5 +1,6 @@
 import { requireCommercialNamespace, requireGroupAccess, companyIds, GROUP_ID } from "./companyWorkspaces.js";
 import { deliverInvitation } from "./invitationLifecycle.js";
+import {emailCallableOptions} from "./emailDelivery.js";
 export { manageInvitation, requestEmailAccess } from "./invitationLifecycle.js";
 import { object, exact, id as inputId } from "./lifecyclePolicy.js";
 import { FieldPath } from "firebase-admin/firestore";
@@ -309,7 +310,7 @@ export const createGovernanceTeam = onCall(callableOptions, async (request) => {
   return { team: { id, organizationId: input.organizationId, name: input.name, memberUids: [], createdAt: now.toDate().toISOString() } };
 });
 
-export const createGovernanceInvitation = onCall(callableOptions, async (request) => {
+export const createGovernanceInvitation = onCall(emailCallableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
   let input;
