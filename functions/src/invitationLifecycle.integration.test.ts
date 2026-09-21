@@ -26,6 +26,12 @@ describe.skipIf(!enabled)("email invitation lifecycle",()=>{
   expect((await root().collection("memberships").doc("invited").get()).data()?.companyIds).toEqual(["d2-hvac-solutions"]);
   expect((await getFirestore().doc("organizations/d2-smart-home/memberships/invited").get()).exists).toBe(false);
  });
+ it("does not invent a delivery date for legacy invitations that were never emailed",async()=>{
+  await root().collection("invitations").doc("legacy-unsent").set({...invite(),status:"pending",createdAt:Timestamp.now(),expiresAt:Timestamp.fromMillis(Date.now()+86400000),invitedByUid:"mail-owner"});
+  const directory=await api.listGovernanceDirectory.run(q("mail-owner",{organizationId:"d2-group"}));
+  expect(directory.invitations[0]?.deliveryStatus).toBe("not_sent");
+  expect(directory.invitations[0]?.deliveryAt).toBe("");
+ });
  it("retains a failed email as failed, allows a later resend and prevents concurrent duplicate sends",async()=>{
   vi.mocked(sendAccessEmail).mockRejectedValueOnce(Error("Provider unavailable"));
   const result=await create();expect(result.invitation.deliveryStatus).toBe("failed");

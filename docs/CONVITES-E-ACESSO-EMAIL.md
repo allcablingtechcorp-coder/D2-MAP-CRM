@@ -70,8 +70,14 @@ Verifique spam e filtros corporativos. O remetente é o serviço padrão do Fire
 
 - 62 testes existentes do frontend e compilação de produção.
 - 21 testes de políticas do backend e compilação TypeScript.
-- 32 testes de integração: 26 existentes, cinco do ciclo de convites e um de autenticação por e-mail no emulador.
+- 33 testes de integração: 26 existentes, seis do ciclo de convites e um de autenticação por e-mail no emulador. Inclui a ausência de data de envio para convites nunca enviados.
 - O teste de autenticação verifica um endereço fora do Google, rejeita endereço divergente e rejeita reutilização do link. O emulador não valida entrega de e-mail real nem o redirecionamento hospedado de produção.
 - Os testes do ciclo verificam envio/falha/reenvio, concorrência, exclusão, auditoria, renovação, preservação do usuário já aceito, isolamento de empresas e limites da solicitação pública.
 
 Referências oficiais: [Firebase email link](https://firebase.google.com/docs/auth/web/email-link-auth), [Identity Platform sendOobCode](https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/sendOobCode).
+
+## Conferência em produção
+
+A publicação inicial desta atualização ocorreu pelo PR #14, com validação e deploy concluídos. Os três convites pendentes foram reenviados pelo próprio painel; o serviço aceitou os envios. O proprietário confirmou o recebimento da mensagem na pasta de spam de sua caixa corporativa. Os demais recebimentos ainda não foram confirmados pelos destinatários. Os endereços e permissões individuais permanecem no painel administrativo, sem publicação nesta documentação.
+
+Na conferência visual, foi corrigida uma data artificial em convites legados sem tentativa de envio. A confirmação de exclusão apresenta o endereço e o efeito da operação; nenhum convite real foi excluído durante a validação.

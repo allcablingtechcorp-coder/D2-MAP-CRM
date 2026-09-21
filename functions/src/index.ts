@@ -253,7 +253,7 @@ function canReadGovernance(actor: Awaited<ReturnType<typeof commercialActor>>): 
 function serializeInvitation(id: string, data: DocumentData) {
   const missingCompanies = data.organizationId === GROUP_ID && (!Array.isArray(data.companyIds) || !data.companyIds.length);
   const status = data.status === "pending" && (!isLiveInvitation(data) || missingCompanies) ? "expired" : String(data.status ?? "expired");
-  return { id, deliveryStatus:data.delivery?.status ?? "not_sent", deliveryAt:dateIso(data.delivery?.updatedAt), needsCompanySelection:missingCompanies, ...(data.companyIds ? {companyIds:data.companyIds} : {}), organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
+  return { id, deliveryStatus:data.delivery?.status ?? "not_sent", deliveryAt:data.delivery?.updatedAt ? dateIso(data.delivery.updatedAt) : "", needsCompanySelection:missingCompanies, ...(data.companyIds ? {companyIds:data.companyIds} : {}), organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
 }
 
 function isLiveInvitation(data: DocumentData): boolean {
