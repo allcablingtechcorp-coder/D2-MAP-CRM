@@ -81,3 +81,5 @@ Referências oficiais: [Firebase email link](https://firebase.google.com/docs/au
 A publicação inicial desta atualização ocorreu pelo PR #14, com validação e deploy concluídos. Os três convites pendentes foram reenviados pelo próprio painel; o serviço aceitou os envios. O proprietário confirmou o recebimento da mensagem na pasta de spam de sua caixa corporativa. Os demais recebimentos ainda não foram confirmados pelos destinatários. Os endereços e permissões individuais permanecem no painel administrativo, sem publicação nesta documentação.
 
 Na conferência visual, foi corrigida uma data artificial em convites legados sem tentativa de envio. A confirmação de exclusão apresenta o endereço e o efeito da operação; nenhum convite real foi excluído durante a validação.
+
+O proprietário também confirmou a entrada pelo link na caixa corporativa e a aceitação do convite. A captura fornecida mostra a sessão com perfil Operations administrator na D2 Smart Home. Assim, envio, autenticação sem conta Google e ativação do acesso foram verificados também no fluxo real, além do emulador.
