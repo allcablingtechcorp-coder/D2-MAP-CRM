@@ -1,4 +1,5 @@
 import {CompanySelector} from "../components/CompanySelector";
+import {EmailAccess} from "../components/EmailAccess";
 import {CompanyContext, type CompanyAccessRepository, type CompanyScopeRepositories} from "./CompanyContext";
 import {businesses,authorizedBusinesses,type BusinessId} from "../domain/businesses";
 import {useBusinessText} from "../i18n/businesses";
@@ -63,7 +64,7 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
   const [session, setSession] = useState<SessionState>({ status: "loading" });
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
-  const [signingIn, setSigningIn] = useState(false);
+  const [completingEmailLink,setCompletingEmailLink]=useState(()=>auth.isEmailLink?.()??false);
   const [sessionLogError, setSessionLogError] = useState(false);
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
 
@@ -76,18 +77,6 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
     if (session.status === "authenticated") void memberships.recordSessionEvent("signed_in").then(() => setSessionLogError(false)).catch(() => setSessionLogError(true));
     if (session.status === "membership_required" || session.status === "access_blocked") void memberships.recordSessionEvent("access_denied").catch(() => undefined);
   }, [memberships, session.status, "identity" in session ? session.identity.uid : null]);
-
-  const signIn = async () => {
-    setSigningIn(true);
-    setActionError(false);
-    try {
-      await auth.signInWithGoogle();
-    } catch {
-      setActionError(true);
-    } finally {
-      setSigningIn(false);
-    }
-  };
 
   const signOut = async () => {
     setActionError(false);
@@ -105,9 +94,9 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
     finally { setAcceptingInvitation(false); }
   };
 
+  if(completingEmailLink || session.status === "signed_out")return <EmailAccess auth={auth} completing={completingEmailLink} onComplete={()=>setCompletingEmailLink(false)} onGoogle={async()=>{await auth.signInWithGoogle();}}/>;
   if (lookupErrorIdentity) return <SessionScreen state="lookup_error" identity={lookupErrorIdentity} onPrimaryAction={signOut} error={actionError} />;
   if (session.status === "loading") return <SessionScreen state="loading" error={actionError} />;
-  if (session.status === "signed_out") return <SessionScreen state="signed_out" onPrimaryAction={signIn} busy={signingIn} error={actionError} />;
   if (session.status === "membership_required") return <SessionScreen state="membership_required" identity={session.identity} onPrimaryAction={signOut} onSecondaryAction={acceptInvitation} busy={acceptingInvitation} error={actionError} />;
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 

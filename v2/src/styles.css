@@ -427,3 +427,19 @@ button, input, select, textarea { font-family: inherit; }
 .company-selector { position:sticky; top:70px; z-index:8; }
 @media(max-width:900px) { .company-selector { top:66px; } }
 @media(max-width:420px) { .company-selector > img { width:90px; height:38px; }.company-selector label { flex:1; }.company-selector label > span { display:none; }.business-cards { grid-template-columns:1fr; } }
+.email-access-form { display:grid; gap:16px; width:100%; margin:20px 0; }
+.email-access-form label { display:grid; gap:8px; text-align:left; font-size:16px; }
+.email-access-form input { width:100%; min-height:48px; font:inherit; padding:12px; border:1px solid #cbd5e1; border-radius:8px; }
+.invitation-note { padding:0 20px; font-size:15px; line-height:1.6; color:#475569; }
+.invitation-cards { padding:20px; display:grid; gap:18px; }
+.invitation-cards article { border:1px solid #dce3ec; border-radius:12px; padding:20px; min-width:0; }
+.invitation-cards header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.invitation-cards header strong { overflow-wrap:anywhere; font-size:16px; }
+.invitation-companies { display:flex; flex-wrap:wrap; gap:14px; margin:16px 0; }
+.invitation-companies img { width:145px; height:46px; object-fit:contain; }
+.invitation-cards dl { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; font-size:15px; }
+.invitation-cards dt { color:#64748b; margin-bottom:6px; }.invitation-cards dd { margin:0; line-height:1.5; }.invitation-cards dd small { display:block; }
+.invitation-cards footer { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+.action-button.danger { color:#b42318; }.governance-modal > p { margin:20px; overflow-wrap:anywhere; }
+@media(max-width:700px) { .invitation-cards dl { grid-template-columns:1fr 1fr; }.invitation-cards { padding:12px; }.invitation-cards article { padding:16px; }.invitation-cards footer .action-button { flex:1; min-height:44px; }.invitation-cards dl { font-size:16px; } }
+@media(max-width:420px) { .invitation-cards dl { grid-template-columns:1fr; } }

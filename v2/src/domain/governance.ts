@@ -40,6 +40,9 @@ export interface MembershipChangeReview {
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
 export interface Invitation {
+  deliveryStatus?:"not_sent"|"sending"|"provider_accepted"|"failed";
+  deliveryAt?:string;
+  needsCompanySelection?:boolean;
   companyIds?: string[];
   id: string;
   organizationId: string;
@@ -71,6 +74,10 @@ export interface InvitationInput {
 }
 
 export type AuditAction =
+  | "invitation.delete"
+  | "invitation.renew"
+  | "invitation.email_provider_accepted"
+  | "invitation.email_failed"
   | "auth.signed_in"
   | "auth.access_denied"
   | "membership.invited"

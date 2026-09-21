@@ -1,4 +1,6 @@
 import { requireCommercialNamespace, requireGroupAccess, companyIds, GROUP_ID } from "./companyWorkspaces.js";
+import { deliverInvitation } from "./invitationLifecycle.js";
+export { manageInvitation, requestEmailAccess } from "./invitationLifecycle.js";
 import { object, exact, id as inputId } from "./lifecyclePolicy.js";
 import { FieldPath } from "firebase-admin/firestore";
 import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
@@ -251,11 +253,11 @@ function canReadGovernance(actor: Awaited<ReturnType<typeof commercialActor>>): 
 function serializeInvitation(id: string, data: DocumentData) {
   const missingCompanies = data.organizationId === GROUP_ID && (!Array.isArray(data.companyIds) || !data.companyIds.length);
   const status = data.status === "pending" && (!isLiveInvitation(data) || missingCompanies) ? "expired" : String(data.status ?? "expired");
-  return { id, ...(data.companyIds ? {companyIds:data.companyIds} : {}), organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
+  return { id, deliveryStatus:data.delivery?.status ?? "not_sent", deliveryAt:dateIso(data.delivery?.updatedAt), needsCompanySelection:missingCompanies, ...(data.companyIds ? {companyIds:data.companyIds} : {}), organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
 }
 
 function isLiveInvitation(data: DocumentData): boolean {
-  return data.status === "pending" && data.expiresAt instanceof Timestamp && data.expiresAt.toMillis() > Date.now();
+  return data.status === "pending" && !data.archivedAt && data.expiresAt instanceof Timestamp && data.expiresAt.toMillis() > Date.now();
 }
 
 function invitationLock(organizationId: string, email: string) {
@@ -278,7 +280,7 @@ export const listGovernanceDirectory = onCall(callableOptions, async (request) =
   ]);
   return {
     nextCursor: input.collection && (input.collection === "teams" ? teamSnapshot : invitationSnapshot).docs.length > 200 ? (input.collection === "teams" ? teamSnapshot : invitationSnapshot).docs[199]!.id : null,
-    invitations: invitationSnapshot.docs.slice(0,200).map((document) => serializeInvitation(document.id, document.data())).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    invitations: invitationSnapshot.docs.slice(0,200).filter(document=>!document.data().archivedAt).map((document) => serializeInvitation(document.id, document.data())).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     teams: teamSnapshot.docs.slice(0,200).map((document) => {
       const data = document.data();
       return { id: document.id, organizationId: input.organizationId, name: String(data.name ?? ""), memberUids: membershipSnapshot.docs.filter((membership) => Array.isArray(membership.data().teamIds) && membership.data().teamIds.includes(document.id)).map((membership) => membership.id), createdAt: dateIso(data.createdAt) };
@@ -339,7 +341,8 @@ export const createGovernanceInvitation = onCall(callableOptions, async (request
     transaction.set(lock, { invitationId: reference.id, updatedAt: now });
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
   });
-  return { invitation: serializeInvitation(reference.id, { ...(input.companyIds ? {companyIds:input.companyIds} : {}), organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth.uid, createdAt: now, expiresAt }) };
+  if(input.organizationId===GROUP_ID)await deliverInvitation(reference.id,request.auth.uid);
+  return { invitation: serializeInvitation(reference.id, (await reference.get()).data()!) };
 });
 
 export const acceptGovernanceInvitation = onCall(callableOptions, async (request) => {
@@ -349,7 +352,7 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
   try { input = parseOrganizationCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const email = typeof request.auth.token.email === "string" ? request.auth.token.email.trim().toLowerCase() : "";
-  if (!email || request.auth.token.email_verified !== true || request.auth.token.firebase?.sign_in_provider !== "google.com") throw new HttpsError("failed-precondition", "A verified Google account is required");
+  if (!email || request.auth.token.email_verified !== true || !["google.com","password"].includes(String(request.auth.token.firebase?.sign_in_provider))) throw new HttpsError("failed-precondition", "A verified email identity is required");
   const organization = database.collection("organizations").doc(input.organizationId);
   const membershipReference = organization.collection("memberships").doc(request.auth.uid);
   let accepted = false;

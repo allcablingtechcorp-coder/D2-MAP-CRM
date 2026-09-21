@@ -4,6 +4,7 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
   GoogleAuthProvider,
+  isSignInWithEmailLink, signInWithEmailLink,
   browserLocalPersistence,
   getAuth,
   onAuthStateChanged,
@@ -38,7 +39,19 @@ export function identityFromFirebaseUser(user: Pick<User, "uid" | "email" | "dis
 }
 
 export class FirebaseAuthGateway implements AuthGateway {
-  constructor(private readonly auth: Auth) {}
+  constructor(private readonly auth: Auth, private readonly functions: Functions) {}
+
+  isEmailLink() { return isSignInWithEmailLink(this.auth,window.location.href); }
+  async requestEmailLink(email:string,locale:string) {
+    await httpsCallable(this.functions,"requestEmailAccess")({email,locale});
+    try{localStorage.setItem("d2-email-link",email.trim().toLowerCase());}catch{/* Email can be entered again when the link is opened. */}
+  }
+  async completeEmailLink(email:string) {
+    await setPersistence(this.auth,browserLocalPersistence);
+    await signInWithEmailLink(this.auth,email.trim().toLowerCase(),window.location.href);
+    window.history.replaceState({},"",window.location.pathname);
+    try{localStorage.removeItem("d2-email-link");}catch{/* No stored address. */}
+  }
 
   observeIdentity(listener: (identity: AuthIdentity | null) => void): () => void {
     return onAuthStateChanged(this.auth, (user) => listener(user ? identityFromFirebaseUser(user) : null));
@@ -96,6 +109,7 @@ export class FirestoreMembershipRepository implements MembershipRepository {
       entries.push(...batch.docs); cursor = batch.size === 100 ? batch.docs.at(-1) : undefined;
     } while(cursor);
     const summaries: Partial<Record<AuditAction, string>> = {
+      "invitation.delete":"admin.auditInvitationDeleted", "invitation.renew":"admin.auditInvitationRenewed", "invitation.email_provider_accepted":"admin.auditInvitationEmailAccepted", "invitation.email_failed":"admin.auditInvitationEmailFailed",
       "membership.updated": "admin.auditAccessUpdated", "membership.suspended": "admin.auditAccessUpdated", "membership.revoked": "admin.auditAccessUpdated",
       "commercial.lead_created": "admin.auditLeadCreated", "commercial.activity_created": "admin.auditActivityCreated", "commercial.activity_completed": "admin.auditActivityCompleted",
       "commercial.opportunity_created": "admin.auditOpportunityCreated", "commercial.opportunity_stage_changed": "admin.auditOpportunityStageChanged",
@@ -162,6 +176,10 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   async createInvitation(input: InvitationInput & { teamIds: string[] }): Promise<Invitation> {
     const callable = httpsCallable<{ organizationId: string; email: string; role: InvitationInput["role"]; scope: InvitationInput["scope"]; modules: InvitationInput["modules"]; teamIds: string[] }, { invitation: Invitation }>(this.functions, "createGovernanceInvitation");
     return (await callable({ organizationId: this.organizationId, ...input })).data.invitation;
+  }
+
+  async manageInvitation(action:"resend"|"renew"|"delete",invitationId:string,patch?:Pick<InvitationInput,"role"|"scope"|"modules"|"companyIds">):Promise<void> {
+    await httpsCallable(this.functions,"manageInvitation")({action,invitationId,...(patch?{patch}:{})});
   }
 
   async createTeam(name: string): Promise<Team> {
@@ -294,7 +312,7 @@ export function createFirebaseGateways(config: FirebaseRuntimeConfig): {
   return {
     forCompany: (id) => ({memberships:new FirestoreMembershipRepository(getFirestore(app),functions,id),commercial:new FirebaseCommercialRepository(functions,id)}),
     companyAccess: {list:async()=> (await httpsCallable<unknown,{members:import("../../application/CompanyContext").CompanyAccessMember[]}>(functions,"companyAccess")({action:"list"})).data.members,save:async(uid,companyIds,reason)=>{await httpsCallable(functions,"companyAccess")({action:"save",targetUid:uid,companyIds,reason});}},
-    auth: new FirebaseAuthGateway(getAuth(app)),
+    auth: new FirebaseAuthGateway(getAuth(app),functions),
     memberships: new FirestoreMembershipRepository(
       getFirestore(app),
       functions,
