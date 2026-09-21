@@ -1,3 +1,4 @@
+import type { CompanyAccessRepository, CompanyScopeRepositories } from "../../application/CompanyContext";
 import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions, ProspectVisitInput } from "../../application/commercial";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
@@ -222,7 +223,7 @@ export class FirebaseCommercialRepository implements CommercialRepository {
     return events.sort((a,b) => b.at.localeCompare(a.at));
   }
   async preferences(locale?: string) {
-    return (await httpsCallable<unknown, { locale: string | null }>(this.functions, "userPreferences")({ organizationId: this.organizationId, ...(locale ? { locale } : {}) })).data;
+    return (await httpsCallable<unknown, { locale: string | null }>(this.functions, "userPreferences")({ organizationId: "d2-group", ...(locale ? { locale } : {}) })).data;
   }
 
   async createLead(input: LeadInput) {
@@ -281,6 +282,8 @@ export function createFirebaseGateways(config: FirebaseRuntimeConfig): {
   auth: AuthGateway;
   memberships: MembershipRepository;
   commercial: CommercialRepository;
+  forCompany:(id:string)=>CompanyScopeRepositories;
+  companyAccess:CompanyAccessRepository;
 } {
   const app = initializeFirebaseApp(config);
   if (config.appCheckSiteKey && !appCheckInitialized.has(app.name)) {
@@ -289,6 +292,8 @@ export function createFirebaseGateways(config: FirebaseRuntimeConfig): {
   }
   const functions = getFunctions(app, config.functionsRegion);
   return {
+    forCompany: (id) => ({memberships:new FirestoreMembershipRepository(getFirestore(app),functions,id),commercial:new FirebaseCommercialRepository(functions,id)}),
+    companyAccess: {list:async()=> (await httpsCallable<unknown,{members:import("../../application/CompanyContext").CompanyAccessMember[]}>(functions,"companyAccess")({action:"list"})).data.members,save:async(uid,companyIds,reason)=>{await httpsCallable(functions,"companyAccess")({action:"save",targetUid:uid,companyIds,reason});}},
     auth: new FirebaseAuthGateway(getAuth(app)),
     memberships: new FirestoreMembershipRepository(
       getFirestore(app),

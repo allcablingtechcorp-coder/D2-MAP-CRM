@@ -40,6 +40,7 @@ export interface MembershipChangeReview {
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 
 export interface Invitation {
+  companyIds?: string[];
   id: string;
   organizationId: string;
   email: string;
@@ -62,6 +63,7 @@ export interface Team {
 }
 
 export interface InvitationInput {
+  companyIds?: string[];
   email: string;
   role: RoleId;
   scope: AccessScope;

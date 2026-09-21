@@ -1,3 +1,4 @@
+import type {CompanyReport} from "../domain/companyReports.ts";
 import { closedDealWinRate, openPipelineValue } from "../domain/metrics.ts";
 import { openStages } from "../domain/crm.ts";
 import { jsPDF } from "jspdf";
@@ -5,6 +6,8 @@ import type { Activity, Lead, Opportunity, OpportunityStage } from "../domain/cr
 import { localeCode, translate, type Locale, type TranslationKey } from "../i18n/translations.ts";
 
 interface ExecutiveReportInput {
+  companies?:CompanyReport[];
+  companyLogos?:Record<string,string>;
   activities: Activity[];
   generatedBy: string;
   leads: Lead[];
@@ -30,7 +33,7 @@ async function imageAsDataUrl(url: string): Promise<string> {
   });
 }
 
-function addHeader(doc: jsPDF, logo: string, title: string, subtitle: string) {
+function addHeader(doc: jsPDF, logo: string, title: string, subtitle: string, companies:CompanyReport[]=[], companyLogos:Record<string,string>={}) {
   doc.setFillColor(...navy);
   doc.rect(0, 0, 210, 37, "F");
   doc.addImage(logo, "PNG", 14, 8, 43, 17);
@@ -41,7 +44,8 @@ function addHeader(doc: jsPDF, logo: string, title: string, subtitle: string) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(190, 202, 221);
-  doc.text(subtitle, 67, 24);
+  if(!companies.length)doc.text(subtitle, 67, 24);
+  companies.forEach((report,index)=>{const x=67+index*63;doc.setFillColor(255,255,255);doc.roundedRect(x,20,59,15,1,1,"F");const image=companyLogos[report.business.id];if(image){const properties=doc.getImageProperties(image);const scale=Math.min(53/properties.width,12/properties.height),width=properties.width*scale,height=properties.height*scale;doc.addImage(image,"PNG",x+(59-width)/2,21.5+(12-height)/2,width,height);}else{doc.setTextColor(...navy);doc.text(report.business.name,x+3,28);}});
 }
 
 function addFooter(doc: jsPDF, locale: Locale, page: number, pageCount: number) {
@@ -72,7 +76,7 @@ function metric(doc: jsPDF, x: number, y: number, width: number, label: string, 
   doc.text(detail, x + 5, y + 22);
 }
 
-export function createExecutiveReportDocument({ activities, generatedBy, leads, opportunities, locale = "en" }: ExecutiveReportInput, logo: string) {
+export function createExecutiveReportDocument({ activities, generatedBy, leads, opportunities, locale = "en", companies=[], companyLogos={} }: ExecutiveReportInput, logo: string) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const generatedAt = new Intl.DateTimeFormat(localeCode[locale], { dateStyle: "long", timeStyle: "short" }).format(new Date());
   const pipelineValue = openPipelineValue(opportunities);
@@ -81,7 +85,7 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
   const formatMoney = (amountCents: number | null) => amountCents === null ? translate(locale, "common.notInformed") : new Intl.NumberFormat(localeCode[locale], { style: "currency", currency: "USD" }).format(amountCents / 100);
   const stageKey = (stage: OpportunityStage) => `stage.${stage}` as TranslationKey;
 
-  addHeader(doc, logo, translate(locale, "report.documentTitle"), translate(locale, "report.documentSubtitle"));
+  addHeader(doc, logo, translate(locale, "report.documentTitle"), translate(locale, "report.documentSubtitle"),companies,companyLogos);
   doc.setTextColor(...slate);
   doc.setFontSize(7.5);
   doc.text(translate(locale, "report.generatedAt", { date: generatedAt }), 14, 45);
@@ -144,7 +148,8 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...slate);
     doc.setFontSize(6.3);
-    doc.text(item.title.slice(0, 57), 18, y + 3);
+    const business = companies.find(company => item.id.startsWith(company.business.id + ":"));
+    doc.text((companies.length > 1 && business ? `${business.business.name} · ${item.title}` : item.title).slice(0, 57), 18, y + 3);
     doc.setTextColor(...blue);
     doc.text(translate(locale, stageKey(item.stage)), 112, y);
     doc.setTextColor(...slate);
@@ -165,17 +170,26 @@ export function createExecutiveReportDocument({ activities, generatedBy, leads, 
   doc.setFontSize(6.5);
   doc.text(translate(locale, "report.geoDescription", { count: mapLeads }), 19, 268.5);
 
+  if(companies.length){
+    doc.addPage();addHeader(doc,logo,translate(locale,"reports.executive"),"D2 Group",companies,companyLogos);
+    companies.forEach((report,index)=>{const y=48+index*89;doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(...navy);doc.text(report.business.name,14,y);const data=report.data;
+      metric(doc,14,y+8,56,translate(locale,"dashboard.activeLeads"),String(data.leads.filter(x=>!x.archived).length),report.business.name);
+      metric(doc,76,y+8,56,translate(locale,"dashboard.openPipeline"),formatMoney(openPipelineValue(data.opportunities.filter(x=>!x.archived))),translate(locale,"audit.openOnly"));
+      metric(doc,138,y+8,58,translate(locale,"activities.completed"),String(data.activities.filter(x=>!x.archived&&x.completed).length),translate(locale,"audit.allAuthorizedRecords"));
+    });
+  }
   const pageCount = doc.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
     addFooter(doc, locale, page, pageCount);
   }
-  doc.setProperties({ title: `D2 Group CRM — ${translate(locale, "reports.executive")}`, subject: translate(locale, "report.subject"), author: generatedBy, creator: "D2 Group CRM" });
+  doc.setProperties({ title: `D2 Group CRM — ${translate(locale, "reports.executive")}`, subject: companies.length?companies.map(c=>c.business.name).join(" + "):translate(locale, "report.subject"), author: generatedBy, creator: "D2 Group CRM" });
   return doc;
 }
 
 export async function exportExecutiveReport(input: ExecutiveReportInput) {
   const logo = await imageAsDataUrl("./logo.png");
-  const doc = createExecutiveReportDocument(input, logo);
-  doc.save(`D2_CRM_Relatorio_Executivo_${new Date().toISOString().slice(0, 10)}.pdf`);
+  const companyLogos=Object.fromEntries(await Promise.all((input.companies??[]).map(async company=>[company.business.id,await imageAsDataUrl(company.business.logo)])));
+  const doc = createExecutiveReportDocument({...input,companyLogos}, logo);
+  doc.save(`D2_CRM_${input.companies?.map(c=>c.business.id).join("_")??"Group"}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }

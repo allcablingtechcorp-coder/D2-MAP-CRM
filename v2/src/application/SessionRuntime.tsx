@@ -1,3 +1,7 @@
+import {CompanySelector} from "../components/CompanySelector";
+import {CompanyContext, type CompanyAccessRepository, type CompanyScopeRepositories} from "./CompanyContext";
+import {businesses,authorizedBusinesses,type BusinessId} from "../domain/businesses";
+import {useBusinessText} from "../i18n/businesses";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { LogIn, LogOut, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { Membership } from "../domain/access";
@@ -29,13 +33,13 @@ export function SessionRuntimeProvider({ children }: { children: ReactNode }) {
   }, []);
   if (!runtimeConfig) return <SessionScreen state="configuration_error" />;
   if (runtimeConfig.mode === "demo") {
-    return <RuntimeSessionContext.Provider value={{ mode: "demo", identity: null, membership: null }}>{children}</RuntimeSessionContext.Provider>;
+    return <DemoCompanyBoundary>{children}</DemoCompanyBoundary>;
   }
   return <FirebaseRuntimeBoundary config={runtimeConfig}>{children}</FirebaseRuntimeBoundary>;
 }
 
 function FirebaseRuntimeBoundary({ config, children }: { config: FirebaseRuntimeConfig; children: ReactNode }) {
-  const [gateways, setGateways] = useState<{ auth: AuthGateway; memberships: MembershipRepository; commercial: CommercialRepository } | null>(null);
+  const [gateways, setGateways] = useState<ReturnType<typeof import("../infrastructure/firebase/adapters").createFirebaseGateways> | null>(null);
   const [initializationError, setInitializationError] = useState(false);
 
   useEffect(() => {
@@ -55,7 +59,7 @@ function FirebaseRuntimeBoundary({ config, children }: { config: FirebaseRuntime
   return <FirebaseSessionBoundary {...gateways} organizationId={config.organizationId}>{children}</FirebaseSessionBoundary>;
 }
 
-function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId, children }: { auth: AuthGateway; memberships: MembershipRepository; commercial: CommercialRepository; organizationId: string; children: ReactNode }) {
+function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, companyAccess, organizationId, children }: { auth: AuthGateway; memberships: MembershipRepository; commercial: CommercialRepository; forCompany:(id:string)=>CompanyScopeRepositories;companyAccess:CompanyAccessRepository; organizationId: string; children: ReactNode }) {
   const [session, setSession] = useState<SessionState>({ status: "loading" });
   const [actionError, setActionError] = useState(false);
   const [lookupErrorIdentity, setLookupErrorIdentity] = useState<AuthIdentity | null>(null);
@@ -108,14 +112,37 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, organizationId
   if (session.status === "access_blocked") return <SessionScreen state="access_blocked" identity={session.identity} onPrimaryAction={signOut} error={actionError} />;
 
   return (
-    <RuntimeSessionContext.Provider key={`${organizationId}:${session.identity.uid}`} value={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, commercial, organizationId, signOut, actionError }}>
+    <CompanyBoundary key={session.identity.uid} forCompany={forCompany} companyAccess={companyAccess} group={{ mode: "firebase", identity: session.identity, membership: session.membership, memberships, commercial, organizationId, signOut, actionError }}>
       {sessionLogError && <SessionLogError />}
       {children}
-    </RuntimeSessionContext.Provider>
+    </CompanyBoundary>
   );
 }
 
 function SessionLogError() { const { t } = useI18n(); return <div className="governance-feedback error" role="alert">{t("audit.sessionLogError")}</div>; }
+
+function DemoCompanyBoundary({children}:{children:ReactNode}) {
+  const [id,setId]=useState<BusinessId>("d2-smart-home");
+  return <CompanyContext.Provider value={{active:businesses.find(b=>b.id===id)!,available:[...businesses],select:setId,superAdmin:true}}><RuntimeSessionContext.Provider value={{mode:"demo",identity:null,membership:null}}>{children}</RuntimeSessionContext.Provider></CompanyContext.Provider>;
+}
+type FirebaseSession=Extract<RuntimeSession,{mode:"firebase"}>;
+function CompanyBoundary({group,forCompany,companyAccess,children}:{group:FirebaseSession;forCompany:(id:string)=>CompanyScopeRepositories;companyAccess:CompanyAccessRepository;children:ReactNode}) {
+  const l=useBusinessText(),{t}=useI18n(),available=authorizedBusinesses(group.membership.companyIds);
+  const storageKey=`d2-company:${group.identity.uid}`;
+  const [selected,setSelected]=useState<string>(()=>{try{return localStorage.getItem(storageKey)??"";}catch{return "";}});
+  const active=available.find(b=>b.id===selected)??available[0];
+  const select=(id:BusinessId)=>{if(!available.some(b=>b.id===id))return;setSelected(id);try{localStorage.setItem(storageKey,id);}catch{/* Selection still works without storage. */}};
+  const scopes=useMemo(()=>Object.fromEntries(businesses.map(b=>[b.id,forCompany(b.id)])),[forCompany]);
+  if(!active)return <div className="session-page"><section className="session-card"><Brand/><p>{l.none}</p><button className="action-button" onClick={group.signOut}>{t("auth.signOut")}</button></section></div>;
+  return <CompanyContext.Provider value={{active,available,select,superAdmin:group.membership.role==="owner",groupMemberships:group.memberships,access:companyAccess,repositories:id=>scopes[id]}}><CompanySession key={active.id} group={group} scope={scopes[active.id]} organizationId={active.id}>{children}</CompanySession></CompanyContext.Provider>;
+}
+function CompanySession({group,scope,organizationId,children}:{group:FirebaseSession;scope:CompanyScopeRepositories;organizationId:string;children:ReactNode}) {
+  const l=useBusinessText(),{t}=useI18n(); const [membership,setMembership]=useState<Membership|null>(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
+  useEffect(()=>{setFailed(false);setMembership(null);return scope.memberships.observeByUid(group.identity.uid,member=>{setMembership(member);setFailed(!member||member.status!=="active");},()=>setFailed(true));},[scope,group.identity.uid,attempt]);
+  if(failed)return <><CompanySelector/><div className="session-page"><section className="session-card"><Brand/><p>{l.none}</p><button className="action-button" onClick={()=>setAttempt(a=>a+1)}>{l.reload}</button><button className="action-button secondary" onClick={group.signOut}>{t("auth.signOut")}</button></section></div></>;
+  if(!membership)return <div className="workflow-feedback" role="status">{l.loading}</div>;
+  return <RuntimeSessionContext.Provider value={{...group,...scope,membership,organizationId}}>{children}</RuntimeSessionContext.Provider>;
+}
 
 type SessionScreenState = "loading" | "signed_out" | "membership_required" | "access_blocked" | "configuration_error" | "lookup_error";
 

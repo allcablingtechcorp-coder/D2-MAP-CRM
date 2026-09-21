@@ -1,3 +1,4 @@
+import { requireCommercialNamespace, requireGroupAccess } from "./companyWorkspaces.js";
 import { createHash } from "node:crypto";
 import { getFirestore, Timestamp, type DocumentData } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -18,6 +19,7 @@ export const saveProspectingVisit = onCall(crmCallableOptions, async (request) =
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
   const uid = request.auth.uid;
   await consumeRequestBudget(uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data);
   exact(input,["organizationId","requestId","action","placeId","name","location","position","leadId","activityId","at","note","teamId"]);
   const org = id(input.organizationId), requestId = id(input.requestId);
@@ -34,6 +36,7 @@ export const saveProspectingVisit = onCall(crmCallableOptions, async (request) =
   const operation = root.collection("prospectingOperations").doc(hash(uid+":"+requestId));
   const placeRef = root.collection("mapPlaces").doc(hash(placeId));
   return db.runTransaction(async tx => {
+    await requireGroupAccess(org,uid,tx);
     const actorSnap = await tx.get(root.collection("memberships").doc(uid));
     if (!actorSnap.exists) throw new HttpsError("permission-denied","Membership required");
     const actor = parseMembershipDocument(actorSnap.data());

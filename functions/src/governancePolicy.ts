@@ -1,6 +1,7 @@
 import { InputValidationError, modules, roles, scopes, type AccessScope, type ModuleId, type RoleId } from "./membershipPolicy.js";
 
 export interface CreateInvitationCommand {
+  companyIds?: string[];
   organizationId: string;
   email: string;
   role: Exclude<RoleId, "owner">;
@@ -27,7 +28,7 @@ function identifiers(value: unknown, name: string): string[] {
 }
 
 export function parseCreateInvitationCommand(value: unknown): CreateInvitationCommand {
-  const input = record(value, ["organizationId", "email", "role", "scope", "modules", "teamIds"]);
+  const input = record(value, ["organizationId", "email", "role", "scope", "modules", "teamIds", "companyIds"]);
   const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputValidationError("email is invalid");
   if (typeof input.role !== "string" || !roles.includes(input.role as RoleId) || input.role === "owner") throw new InputValidationError("role is invalid");
@@ -35,7 +36,7 @@ export function parseCreateInvitationCommand(value: unknown): CreateInvitationCo
   if (!Array.isArray(input.modules) || input.modules.length === 0 || input.modules.length > 8 || input.modules.some((item) => typeof item !== "string" || !modules.includes(item as ModuleId))) throw new InputValidationError("modules are invalid");
   const teamIds = identifiers(input.teamIds, "teamIds");
   if (input.scope === "assigned_teams" && teamIds.length === 0) throw new InputValidationError("teamIds requires at least one team for assigned_teams scope");
-  return { organizationId: identifier(input.organizationId, "organizationId"), email, role: input.role as Exclude<RoleId, "owner">, scope: input.scope as Exclude<AccessScope, "custom">, modules: [...new Set(input.modules as ModuleId[])], teamIds };
+  return { ...(input.companyIds !== undefined ? {companyIds: identifiers(input.companyIds,"companyIds")} : {}), organizationId: identifier(input.organizationId, "organizationId"), email, role: input.role as Exclude<RoleId, "owner">, scope: input.scope as Exclude<AccessScope, "custom">, modules: [...new Set(input.modules as ModuleId[])], teamIds };
 }
 
 export function parseCreateTeamCommand(value: unknown): { organizationId: string; name: string } {

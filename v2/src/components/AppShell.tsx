@@ -15,6 +15,7 @@ import {
 import type { ModuleId } from "../domain/access";
 import { useI18n, type Locale, type TranslationKey } from "../i18n/i18n";
 import { LanguageFlag } from "./LanguageFlag";
+import {CompanySelector} from "./CompanySelector";
 import { Brand } from "./Brand";
 
 export interface NavigationItem {
@@ -132,6 +133,7 @@ export function AppShell({
 
           </div>
         </header>
+        <CompanySelector/>
         <main className="page-content">{children}</main>
       </div>
     </div>

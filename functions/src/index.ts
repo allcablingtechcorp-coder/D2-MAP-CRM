@@ -1,3 +1,4 @@
+import { requireCommercialNamespace, requireGroupAccess, companyIds, GROUP_ID } from "./companyWorkspaces.js";
 import { object, exact, id as inputId } from "./lifecyclePolicy.js";
 import { FieldPath } from "firebase-admin/firestore";
 import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
@@ -55,6 +56,7 @@ export const saveMembership = onCall(callableOptions, async (request) => {
   const auditReference = organization.collection("auditEvents").doc();
 
   await database.runTransaction(async (transaction) => {
+    await requireGroupAccess(input.organizationId, authenticatedUser.uid, transaction);
     const [actorSnapshot, targetSnapshot, ...teamSnapshots] = await Promise.all([
       transaction.get(actorReference),
       transaction.get(targetReference),
@@ -121,6 +123,7 @@ export const saveMembership = onCall(callableOptions, async (request) => {
 });
 
 async function commercialActor(organizationId: string, uid: string, transaction?: Transaction) {
+  await requireGroupAccess(organizationId, uid, transaction);
   const reference = database.doc(`organizations/${organizationId}/memberships/${uid}`);
   const snapshot = await (transaction ? transaction.get(reference) : reference.get());
   if (!snapshot.exists) throw new HttpsError("permission-denied", "Active membership is required");
@@ -189,6 +192,7 @@ async function scopedDocuments(organizationId: string, collectionName: string, a
 export const loadCommercialWorkspace = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseOrganizationInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -212,6 +216,7 @@ export const loadCommercialWorkspace = onCall(callableOptions, async (request) =
 export const createCommercialLead = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseCreateLeadInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -244,8 +249,9 @@ function canReadGovernance(actor: Awaited<ReturnType<typeof commercialActor>>): 
 }
 
 function serializeInvitation(id: string, data: DocumentData) {
-  const status = data.status === "pending" && !isLiveInvitation(data) ? "expired" : String(data.status ?? "expired");
-  return { id, organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
+  const missingCompanies = data.organizationId === GROUP_ID && (!Array.isArray(data.companyIds) || !data.companyIds.length);
+  const status = data.status === "pending" && (!isLiveInvitation(data) || missingCompanies) ? "expired" : String(data.status ?? "expired");
+  return { id, ...(data.companyIds ? {companyIds:data.companyIds} : {}), organizationId: String(data.organizationId ?? ""), email: String(data.email ?? ""), role: String(data.role ?? "viewer"), scope: String(data.scope ?? "assigned_records"), modules: Array.isArray(data.modules) ? data.modules : [], teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], status, invitedByUid: String(data.invitedByUid ?? ""), createdAt: dateIso(data.createdAt), expiresAt: dateIso(data.expiresAt) };
 }
 
 function isLiveInvitation(data: DocumentData): boolean {
@@ -263,7 +269,7 @@ export const listGovernanceDirectory = onCall(callableOptions, async (request) =
   try { const data = object(request.data); exact(data, ["organizationId", "collection", "cursor"]); if (data.collection !== undefined && !["invitations", "teams"].includes(String(data.collection))) throw new HttpsError("invalid-argument", "Invalid collection"); input = { organizationId: inputId(data.organizationId), collection: data.collection, cursor: data.cursor ? inputId(data.cursor) : "" }; }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const actor = await commercialActor(input.organizationId, request.auth.uid);
-  if (!canReadGovernance(actor)) throw new HttpsError("permission-denied", "Administrative read access is required");
+  if ((input.organizationId === GROUP_ID && actor.role !== "owner") || !canReadGovernance(actor)) throw new HttpsError("permission-denied", "Administrative read access is required");
   const pageQuery = (kind: string) => { const query = database.collection(`organizations/${input.organizationId}/${kind}`).orderBy(FieldPath.documentId()); return (input.cursor ? query.startAfter(input.cursor) : query).limit(201).get(); };
   const [invitationSnapshot, teamSnapshot, membershipSnapshot] = await Promise.all([
     input.collection === "teams" ? { docs: [] } : pageQuery("invitations"),
@@ -271,6 +277,7 @@ export const listGovernanceDirectory = onCall(callableOptions, async (request) =
     database.collection(`organizations/${input.organizationId}/memberships`).get(),
   ]);
   return {
+    nextCursor: input.collection && (input.collection === "teams" ? teamSnapshot : invitationSnapshot).docs.length > 200 ? (input.collection === "teams" ? teamSnapshot : invitationSnapshot).docs[199]!.id : null,
     invitations: invitationSnapshot.docs.slice(0,200).map((document) => serializeInvitation(document.id, document.data())).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     teams: teamSnapshot.docs.slice(0,200).map((document) => {
       const data = document.data();
@@ -304,7 +311,7 @@ export const createGovernanceInvitation = onCall(callableOptions, async (request
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
   let input;
-  try { input = parseCreateInvitationCommand(request.data); }
+  try { input = parseCreateInvitationCommand(request.data); if (["d2-smart-home","d2-hvac-solutions"].includes(input.organizationId)) throw new HttpsError("failed-precondition","Issue company invitations through D2 Group"); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const actor = await commercialActor(input.organizationId, request.auth.uid);
   if (!canManageMemberships(actor)) throw new HttpsError("permission-denied", "Owner access is required");
@@ -323,14 +330,16 @@ export const createGovernanceInvitation = onCall(callableOptions, async (request
       transaction.get(organization.collection("invitations").where("email", "==", input.email)),
       ...input.teamIds.map((teamId) => transaction.get(organization.collection("teams").doc(teamId))),
     ]);
-    if (!membershipMatches.empty || invitationMatches.docs.some((document) => isLiveInvitation(document.data()))) throw new HttpsError("already-exists", "This email already has access or a pending invitation");
+    if (!membershipMatches.empty || invitationMatches.docs.some((document) => isLiveInvitation(document.data()) && (input.organizationId !== GROUP_ID || Array.isArray(document.data().companyIds)))) throw new HttpsError("already-exists", "This email already has access or a pending invitation");
     if (teamSnapshots.some((snapshot) => !snapshot.exists)) throw new HttpsError("failed-precondition", "An assigned team does not exist");
-    const data = { organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth!.uid, createdAt: now, expiresAt };
+    const selectedCompanies = input.organizationId === GROUP_ID ? companyIds(input.companyIds) : [];
+    if(input.organizationId === GROUP_ID && (!selectedCompanies.length || input.scope === "assigned_teams")) throw new HttpsError("invalid-argument","Select companies; configure teams inside each company after acceptance");
+    const data = { ...(selectedCompanies.length ? {companyIds:selectedCompanies} : {}), organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth!.uid, createdAt: now, expiresAt };
     for (const document of invitationMatches.docs) if (document.data().status === "pending") transaction.update(document.ref, { status: "expired", updatedAt: now });
     transaction.set(lock, { invitationId: reference.id, updatedAt: now });
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
   });
-  return { invitation: serializeInvitation(reference.id, { organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth.uid, createdAt: now, expiresAt }) };
+  return { invitation: serializeInvitation(reference.id, { ...(input.companyIds ? {companyIds:input.companyIds} : {}), organizationId: input.organizationId, email: input.email, role: input.role, scope: input.scope, modules: input.modules, teamIds: input.teamIds, status: "pending", invitedByUid: request.auth.uid, createdAt: now, expiresAt }) };
 });
 
 export const acceptGovernanceInvitation = onCall(callableOptions, async (request) => {
@@ -360,7 +369,14 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
     const teams = await Promise.all(validated.teamIds.map((teamId) => transaction.get(organization.collection("teams").doc(teamId))));
     if (teams.some((team) => !team.exists)) throw new HttpsError("failed-precondition", "An assigned team no longer exists");
     const displayName = typeof request.auth!.token.name === "string" && request.auth!.token.name.trim() ? request.auth!.token.name.trim() : email;
-    transaction.create(membershipReference, { email, displayName, role: data.role, status: "active", scope: data.scope, modules: data.modules, teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], ownerProtected: false, invitedByUid: data.invitedByUid, invitationId: invitation.id, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    const selectedCompanies = input.organizationId === GROUP_ID ? companyIds(data.companyIds) : [];
+    const membershipData = { ...(selectedCompanies.length ? {companyIds:selectedCompanies} : {}), email, displayName, role: data.role, status: "active", scope: data.scope, modules: data.modules, teamIds: Array.isArray(data.teamIds) ? data.teamIds : [], ownerProtected: false, invitedByUid: data.invitedByUid, invitationId: invitation.id, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+    const companyRefs = selectedCompanies.map(org=>database.doc(`organizations/${org}/memberships/${request.auth!.uid}`));
+    const existingCopies = await Promise.all(companyRefs.map(ref=>transaction.get(ref)));
+    if(existingCopies.some(snap=>snap.exists)) throw new HttpsError("failed-precondition","Company membership already exists");
+    transaction.create(membershipReference,membershipData);
+    const {companyIds:_companyIds,...companyMembership}=membershipData;
+    companyRefs.forEach(ref=>transaction.create(ref,companyMembership));
     transaction.update(invitation.ref, { status: "accepted", acceptedByUid: request.auth!.uid, acceptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     transaction.set(lock, { invitationId: invitation.id, acceptedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, email, "membership.invitation_accepted", "membership", request.auth!.uid, "Access invitation accepted");
@@ -396,6 +412,7 @@ export const recordSessionEvent = onCall(callableOptions, async (request) => {
 export const createCommercialCompany = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseCreateCompanyInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -420,6 +437,7 @@ export const createCommercialCompany = onCall(callableOptions, async (request) =
 export const createCommercialContact = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseCreateContactInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -459,6 +477,7 @@ async function linkedCompany(transaction: Transaction, organizationId: string, u
 export const createCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseCreateActivityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -481,6 +500,7 @@ export const createCommercialActivity = onCall(callableOptions, async (request) 
 export const createCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseCreateOpportunityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -503,6 +523,7 @@ export const createCommercialOpportunity = onCall(callableOptions, async (reques
 export const transitionCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseTransitionOpportunityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -532,6 +553,7 @@ export const transitionCommercialOpportunity = onCall(callableOptions, async (re
 export const completeCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseRecordCommandInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -558,3 +580,5 @@ export const completeCommercialActivity = onCall(callableOptions, async (request
 export { loadCommercialPage, changeCommercialRecord, listAssignmentOptions, commercialRecordHistory, userPreferences } from "./commercialLifecycle.js";
 
 export { saveProspectingVisit } from "./prospectingVisits.js";
+
+export { companyAccess } from "./companyWorkspaces.js";

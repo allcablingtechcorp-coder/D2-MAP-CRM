@@ -1,3 +1,4 @@
+import {useCompany} from "./CompanyContext";
 import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions, ProspectVisitInput } from "./commercial";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { demoActivities, demoCompanies, demoContacts, demoLeads, demoOpportunities } from "../data/demo";
@@ -55,10 +56,11 @@ function loadDemoSnapshot(storageKey: string): CommercialWorkspaceSnapshot {
 const CrmWorkspaceContext = createContext<CrmWorkspaceValue | null>(null);
 
 export function CrmWorkspaceProvider({ children }: { children: ReactNode }) {
+  const company=useCompany();
   const runtime = useRuntimeSession();
   return runtime.mode === "firebase"
     ? <FirebaseWorkspace key={JSON.stringify(runtime.membership)} repository={runtime.commercial} membership={runtime.membership}>{children}</FirebaseWorkspace>
-    : <DemoWorkspace storageKey={workspaceStorageKey()}>{children}</DemoWorkspace>;
+    : <DemoWorkspace key={company.active.id} storageKey={workspaceStorageKey()+":"+company.active.id}>{children}</DemoWorkspace>;
 }
 
 function DemoWorkspace({ children, storageKey }: { children: ReactNode; storageKey: string }) {

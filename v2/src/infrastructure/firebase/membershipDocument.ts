@@ -59,6 +59,7 @@ export function membershipFromDocument(uid: string, value: unknown): Membership 
   }
   return {
     uid,
+    ...(Array.isArray(value.companyIds) ? { companyIds: value.companyIds.filter((id): id is string => id === "d2-smart-home" || id === "d2-hvac-solutions") } : {}),
     email: requiredString(value, "email").toLowerCase(),
     displayName: requiredString(value, "displayName"),
     role,

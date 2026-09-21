@@ -62,6 +62,25 @@ afterAll(async () => {
 });
 
 describe("Firestore governance rules", () => {
+  it("isolates company directories and rejects stale grants or cross-company self reads",async()=>{
+    await environment.withSecurityRulesDisabled(async context=>{
+      const db=context.firestore();
+      await updateDoc(doc(db,membershipPath("operations")),{companyIds:["d2-smart-home"]});
+      for(const org of ["d2-smart-home","d2-hvac-solutions"]){
+        await setDoc(doc(db,`organizations/${org}/memberships/operations`),membership("operations_admin"));
+        await setDoc(doc(db,`organizations/${org}/auditEvents/one`),{action:"visit"});
+      }
+    });
+    const db=environment.authenticatedContext("operations").firestore();
+    await assertSucceeds(getDocs(collection(db,"organizations/d2-smart-home/memberships")));
+    await assertSucceeds(getDocs(collection(db,"organizations/d2-smart-home/auditEvents")));
+    await assertFails(getDocs(collection(db,"organizations/d2-hvac-solutions/memberships")));
+    await assertFails(getDoc(doc(db,"organizations/d2-hvac-solutions/memberships/operations")));
+    await assertFails(getDocs(collection(db,"organizations/d2-hvac-solutions/auditEvents")));
+    await assertFails(updateDoc(doc(db,membershipPath("operations")),{companyIds:["d2-smart-home","d2-hvac-solutions"]}));
+    await environment.withSecurityRulesDisabled(async context=>updateDoc(doc(context.firestore(),membershipPath("operations")),{status:"suspended"}));
+    await assertFails(getDocs(collection(db,"organizations/d2-smart-home/auditEvents")));
+  });
   it("rejects unauthenticated membership reads", async () => {
     const database = environment.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(database, membershipPath("representative"))));
@@ -74,11 +93,11 @@ describe("Firestore governance rules", () => {
     await assertSucceeds(getDoc(doc(suspendedDatabase, membershipPath("suspended"))));
   });
 
-  it("allows active owners and operations administrators to list memberships", async () => {
+  it("limits the group directory to the super admin", async () => {
     const ownerDatabase = environment.authenticatedContext("owner").firestore();
     const operationsDatabase = environment.authenticatedContext("operations").firestore();
     await assertSucceeds(getDocs(collection(ownerDatabase, `organizations/${organizationId}/memberships`)));
-    await assertSucceeds(getDocs(collection(operationsDatabase, `organizations/${organizationId}/memberships`)));
+    await assertFails(getDocs(collection(operationsDatabase, `organizations/${organizationId}/memberships`)));
   });
 
   it("rejects membership lists for sales users and suspended administrators", async () => {
@@ -96,14 +115,15 @@ describe("Firestore governance rules", () => {
     await assertFails(deleteDoc(reference));
   });
 
-  it("limits invitations and audit logs to active administrators", async () => {
+  it("limits group invitations and audit logs to the active super admin", async () => {
     const ownerDatabase = environment.authenticatedContext("owner").firestore();
     const operationsDatabase = environment.authenticatedContext("operations").firestore();
     const representativeDatabase = environment.authenticatedContext("representative").firestore();
     const invitation = doc(ownerDatabase, `organizations/${organizationId}/invitations/invite-1`);
-    const audit = doc(operationsDatabase, `organizations/${organizationId}/auditEvents/audit-1`);
+    const audit = doc(ownerDatabase, `organizations/${organizationId}/auditEvents/audit-1`);
     await assertSucceeds(getDoc(invitation));
     await assertSucceeds(getDoc(audit));
+    await assertFails(getDoc(doc(operationsDatabase, audit.path)));
     await assertFails(getDoc(doc(representativeDatabase, invitation.path)));
     await assertFails(getDoc(doc(representativeDatabase, audit.path)));
     await assertFails(setDoc(doc(ownerDatabase, `organizations/${organizationId}/auditEvents/client-write`), { action: "forged" }));
@@ -131,9 +151,9 @@ describe("Firestore governance rules", () => {
   });
 
   it("revokes administrative reads after suspension", async () => {
-    const db = environment.authenticatedContext("operations").firestore();
+    const db = environment.authenticatedContext("owner").firestore();
     await assertSucceeds(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
-    await environment.withSecurityRulesDisabled(async (context) => updateDoc(doc(context.firestore(), membershipPath("operations")), { status: "suspended" }));
+    await environment.withSecurityRulesDisabled(async (context) => updateDoc(doc(context.firestore(), membershipPath("owner")), { status: "suspended" }));
     await assertFails(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
   });
 });

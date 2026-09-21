@@ -42,6 +42,7 @@ export type AccessScope = "organization" | "assigned_teams" | "assigned_records"
 export type MembershipStatus = "invited" | "active" | "suspended" | "revoked";
 
 export interface Membership {
+  companyIds?: string[];
   uid: string;
   email: string;
   displayName: string;

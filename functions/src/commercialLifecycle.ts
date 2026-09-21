@@ -1,3 +1,4 @@
+import { requireCommercialNamespace, requireGroupAccess } from "./companyWorkspaces.js";
 import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
 import { FieldPath, FieldValue, Timestamp, getFirestore, type DocumentData, type Transaction, type Query } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -11,6 +12,7 @@ const serializers = { leads: serializeLead, companies: serializeCompany, contact
 const readPermissions: Record<RecordCollection, CommercialPermission> = { leads: "lead.read", companies: "lead.read", contacts: "lead.read", activities: "activity.read", opportunities: "opportunity.read" };
 const writePermissions: Record<RecordCollection, CommercialPermission> = { leads: "lead.update", companies: "lead.update", contacts: "lead.update", activities: "activity.create", opportunities: "opportunity.update" };
 async function member(org: string, uid: string, tx?: Transaction) {
+  await requireGroupAccess(org,uid,tx);
   const ref = getFirestore().doc(`organizations/${org}/memberships/${uid}`);
   const snap = await (tx ? tx.get(ref) : ref.get());
   if (!snap.exists) throw new HttpsError("permission-denied", "Active membership required");
@@ -39,6 +41,7 @@ function readQueries(base: Query, actor: MembershipDocument, uid: string) {
 export const loadCommercialPage = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "cursor"]);
   const org = id(input.organizationId), kind = collection(input.collection), cursor = input.cursor ? id(input.cursor) : "";
   const actor = await member(org, request.auth.uid);
@@ -58,6 +61,7 @@ export const loadCommercialPage = onCall(options, async (request) => {
 export const changeCommercialRecord = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "recordId", "revision", "action", "patch", "reason", "ownerUid", "teamId"]);
   const org = id(input.organizationId), kind = collection(input.collection), recordId = id(input.recordId);
   if (typeof input.revision !== "string" || input.revision.length > 80) throw new HttpsError("invalid-argument", "Revision required");
@@ -127,6 +131,7 @@ export const changeCommercialRecord = onCall(options, async (request) => {
 export const listAssignmentOptions = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "cursor"]);
   const org = id(input.organizationId), actor = await member(org, request.auth.uid), cursor = input.cursor ? id(input.cursor) : "";
   const db = getFirestore();
@@ -147,6 +152,7 @@ export const listAssignmentOptions = onCall(options, async (request) => {
 export const commercialRecordHistory = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
   await consumeRequestBudget(request.auth.uid);
+  requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "recordId", "cursor"]);
   const org = id(input.organizationId), kind = collection(input.collection), actor = await member(org, request.auth.uid);
   if (!allowed(actor, kind)) throw new HttpsError("permission-denied", "Read permission required");
