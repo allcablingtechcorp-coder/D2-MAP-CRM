@@ -2,8 +2,8 @@ import type { MembershipDocument, RoleId } from "./membershipPolicy.js";
 import { InputValidationError } from "./membershipPolicy.js";
 
 export type CommercialPermission =
-  | "lead.read" | "lead.create" | "lead.assign"
-  | "opportunity.read" | "opportunity.update" | "opportunity.close"
+  | "lead.read" | "lead.create" | "lead.update" | "lead.assign"
+  | "opportunity.read" | "opportunity.update" | "opportunity.close" | "opportunity.reopen"
   | "activity.read" | "activity.create";
 
 export interface CommercialRecordAccess {
@@ -12,6 +12,7 @@ export interface CommercialRecordAccess {
 }
 
 export interface CreateLeadInput {
+  teamId?: string | null;
   organizationId: string;
   companyName: string;
   location: string;
@@ -22,6 +23,8 @@ export interface CreateLeadInput {
 }
 
 export interface CreateActivityInput {
+  teamId?: string | null;
+  companyId?: string;
   organizationId: string;
   kind: "call" | "email" | "meeting" | "visit" | "note";
   subject: string;
@@ -30,6 +33,8 @@ export interface CreateActivityInput {
 }
 
 export interface CreateOpportunityInput {
+  teamId?: string | null;
+  companyId?: string;
   organizationId: string;
   title: string;
   companyName: string;
@@ -39,6 +44,7 @@ export interface CreateOpportunityInput {
 }
 
 export interface CreateCompanyInput {
+  teamId?: string | null;
   organizationId: string;
   name: string;
   location: string;
@@ -75,6 +81,8 @@ const rolePermissions: Record<RoleId, ReadonlySet<CommercialPermission>> = {
 };
 
 const permissionModules: Record<CommercialPermission, readonly string[]> = {
+  "lead.update": ["leads", "companies"],
+  "opportunity.reopen": ["pipeline"],
   "lead.read": ["dashboard", "leads", "companies", "reports"],
   "lead.create": ["leads", "companies", "prospecting"],
   "lead.assign": ["leads", "companies"],
@@ -142,6 +150,8 @@ export function hasCommercialPermission(membership: MembershipDocument, permissi
   if (membership.status !== "active") return false;
   const override = membership.permissionOverrides?.[permission];
   if (override !== undefined) return override;
+  if (permission === "lead.update") return membership.role !== "viewer";
+  if (permission === "opportunity.reopen") return ["owner", "operations_admin", "sales_manager"].includes(membership.role);
   return rolePermissions[membership.role].has(permission);
 }
 
@@ -164,8 +174,9 @@ export function parseOrganizationInput(value: unknown): { organizationId: string
 }
 
 export function parseCreateLeadInput(value: unknown): CreateLeadInput {
-  const input = requestObject(value, ["organizationId", "companyName", "location", "source", "priority", "nextAction", "nextActionAt"]);
+  const input = requestObject(value, ["teamId", "organizationId", "companyName", "location", "source", "priority", "nextAction", "nextActionAt"]);
   return {
+    ...(input.teamId === undefined ? {} : { teamId: input.teamId === null ? null : identifier(input.teamId, "teamId") }),
     organizationId: identifier(input.organizationId, "organizationId"),
     companyName: text(input.companyName, "companyName", 200),
     location: text(input.location, "location", 300),
@@ -177,8 +188,10 @@ export function parseCreateLeadInput(value: unknown): CreateLeadInput {
 }
 
 export function parseCreateActivityInput(value: unknown): CreateActivityInput {
-  const input = requestObject(value, ["organizationId", "kind", "subject", "companyName", "dueAt"]);
+  const input = requestObject(value, ["teamId", "organizationId", "kind", "subject", "companyName", "companyId", "dueAt"]);
   return {
+    ...(input.teamId === undefined ? {} : { teamId: input.teamId === null ? null : identifier(input.teamId, "teamId") }),
+    ...(input.companyId ? { companyId: identifier(input.companyId, "companyId") } : {}),
     organizationId: identifier(input.organizationId, "organizationId"),
     kind: oneOf(input.kind, activityKinds, "kind"),
     subject: text(input.subject, "subject", 500),
@@ -188,13 +201,15 @@ export function parseCreateActivityInput(value: unknown): CreateActivityInput {
 }
 
 export function parseCreateOpportunityInput(value: unknown): CreateOpportunityInput {
-  const input = requestObject(value, ["organizationId", "title", "companyName", "amountCents", "nextAction", "expectedCloseAt"]);
+  const input = requestObject(value, ["teamId", "organizationId", "title", "companyName", "companyId", "amountCents", "nextAction", "expectedCloseAt"]);
   if (input.amountCents !== null && (!Number.isSafeInteger(input.amountCents) || Number(input.amountCents) <= 0 || Number(input.amountCents) > 999_999_999_999)) {
     throw new InputValidationError("amountCents is invalid");
   }
   return {
+    ...(input.teamId === undefined ? {} : { teamId: input.teamId === null ? null : identifier(input.teamId, "teamId") }),
     organizationId: identifier(input.organizationId, "organizationId"),
     title: text(input.title, "title", 200),
+    ...(input.companyId ? { companyId: identifier(input.companyId, "companyId") } : {}),
     companyName: text(input.companyName, "companyName", 200),
     amountCents: input.amountCents === null ? null : Number(input.amountCents),
     nextAction: text(input.nextAction, "nextAction", 500),
@@ -203,10 +218,11 @@ export function parseCreateOpportunityInput(value: unknown): CreateOpportunityIn
 }
 
 export function parseCreateCompanyInput(value: unknown): CreateCompanyInput {
-  const input = requestObject(value, ["organizationId", "name", "location", "industry", "website", "phone"]);
+  const input = requestObject(value, ["teamId", "organizationId", "name", "location", "industry", "website", "phone"]);
   const website = optionalText(input.website, "website", 300);
   if (website && !/^https?:\/\//i.test(website)) throw new InputValidationError("website is invalid");
   return {
+    ...(input.teamId === undefined ? {} : { teamId: input.teamId === null ? null : identifier(input.teamId, "teamId") }),
     organizationId: identifier(input.organizationId, "organizationId"),
     name: text(input.name, "name", 200),
     location: text(input.location, "location", 300),

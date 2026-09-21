@@ -1,3 +1,4 @@
+import type { RecordChange, RecordCollection, RecordEvent, AssignmentOptions } from "../../application/commercial";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
@@ -11,7 +12,7 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, type Firestore, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, startAfter, type QueryDocumentSnapshot, type Firestore, type Timestamp } from "firebase/firestore";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import type { AuthGateway, AuthIdentity, MembershipRepository } from "../../application/session";
 import type { Membership } from "../../domain/access";
@@ -82,12 +83,12 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   }
 
   async listAudit(): Promise<AuditEvent[]> {
-    const auditQuery = query(
-      collection(this.database, "organizations", this.organizationId, "auditEvents"),
-      orderBy("occurredAt", "desc"),
-      limit(100),
-    );
-    const snapshot = await getDocs(auditQuery);
+    const entries: QueryDocumentSnapshot[] = [];
+    let cursor: QueryDocumentSnapshot | undefined;
+    do {
+      const batch = await getDocs(query(collection(this.database, "organizations", this.organizationId, "auditEvents"), orderBy("occurredAt", "desc"), ...(cursor ? [startAfter(cursor)] : []), limit(100)));
+      entries.push(...batch.docs); cursor = batch.size === 100 ? batch.docs.at(-1) : undefined;
+    } while(cursor);
     const summaries: Partial<Record<AuditAction, string>> = {
       "membership.updated": "admin.auditAccessUpdated", "membership.suspended": "admin.auditAccessUpdated", "membership.revoked": "admin.auditAccessUpdated",
       "commercial.lead_created": "admin.auditLeadCreated", "commercial.activity_created": "admin.auditActivityCreated", "commercial.activity_completed": "admin.auditActivityCompleted",
@@ -96,7 +97,7 @@ export class FirestoreMembershipRepository implements MembershipRepository {
       "team.created": "admin.auditTeamCreated", "membership.invitation_accepted": "admin.auditInvitationAccepted",
       "membership.invited": "admin.auditInvitationCreated", "auth.signed_in": "admin.auditSignedIn", "auth.access_denied": "admin.auditAccessDenied",
     };
-    return snapshot.docs.map((entry) => {
+    return entries.map((entry) => {
       const data = entry.data();
       const occurredAt = data.occurredAt as Timestamp | undefined;
       const action = data.action as AuditAction;
@@ -108,7 +109,7 @@ export class FirestoreMembershipRepository implements MembershipRepository {
         actorEmail: String(data.actorEmail ?? ""),
         targetType: String(data.targetType ?? "membership") as AuditEvent["targetType"],
         targetId: String(data.targetId ?? ""),
-        summary: summaries[action] ?? "admin.auditAccessUpdated",
+        summary: summaries[action] ?? (String(action).startsWith("commercial.") ? "admin.auditCommercialChanged" : "admin.auditAccessUpdated"),
         ...(typeof data.reason === "string" ? { reason: data.reason } : {}),
         occurredAt: occurredAt?.toDate().toISOString() ?? new Date(0).toISOString(),
       };
@@ -140,8 +141,16 @@ export class FirestoreMembershipRepository implements MembershipRepository {
   }
 
   async listGovernanceDirectory(): Promise<{ invitations: Invitation[]; teams: Team[] }> {
-    const callable = httpsCallable<{ organizationId: string }, { invitations: Invitation[]; teams: Team[] }>(this.functions, "listGovernanceDirectory");
-    return (await callable({ organizationId: this.organizationId })).data;
+    const result: { invitations: Invitation[]; teams: Team[] } = { invitations: [], teams: [] };
+    for (const collection of ["invitations", "teams"] as const) {
+      let cursor: string | null = null;
+      do {
+        const data: { invitations: Invitation[]; teams: Team[]; nextCursor: string | null } = (await httpsCallable<unknown, { invitations: Invitation[]; teams: Team[]; nextCursor: string | null }>(this.functions, "listGovernanceDirectory")({ organizationId: this.organizationId, collection, cursor })).data;
+        result.invitations.push(...data.invitations); result.teams.push(...data.teams); cursor = data.nextCursor;
+      } while (cursor);
+    }
+    result.invitations.sort((a,b) => b.createdAt.localeCompare(a.createdAt)); result.teams.sort((a,b) => a.name.localeCompare(b.name));
+    return result;
   }
 
   async createInvitation(input: InvitationInput & { teamIds: string[] }): Promise<Invitation> {
@@ -171,18 +180,50 @@ export class FirebaseCommercialRepository implements CommercialRepository {
   constructor(private readonly functions: Functions, private readonly organizationId: string) {}
 
   async load(): Promise<CommercialWorkspaceSnapshot> {
-    const callable = httpsCallable<{ organizationId: string }, CallableWorkspace>(this.functions, "loadCommercialWorkspace");
-    const result = await callable({ organizationId: this.organizationId });
-    return result.data;
+    const snapshot: CommercialWorkspaceSnapshot = { leads: [], opportunities: [], activities: [], companies: [], contacts: [] };
+    await Promise.all((Object.keys(snapshot) as RecordCollection[]).map(async (collection) => {
+      const callable = httpsCallable<{ organizationId: string; collection: string; cursor: string | null }, { records: never[]; nextCursor: string | null }>(this.functions, "loadCommercialPage");
+      let cursor: string | null = null;
+      do {
+        const page: { records: never[]; nextCursor: string | null } = (await callable({ organizationId: this.organizationId, collection, cursor })).data;
+        snapshot[collection].push(...page.records); cursor = page.nextCursor;
+      } while (cursor);
+    }));
+    const companyNames = new Map(snapshot.companies.map((company) => [company.id, company.name]));
+    for (const record of [...snapshot.leads, ...snapshot.contacts, ...snapshot.activities, ...snapshot.opportunities]) if (record.companyId && companyNames.has(record.companyId)) record.companyName = companyNames.get(record.companyId)!;
+    return snapshot;
+  }
+  async changeRecord(input: RecordChange) {
+    await httpsCallable(this.functions, "changeCommercialRecord")({ organizationId: this.organizationId, ...input });
+  }
+  async assignmentOptions(): Promise<AssignmentOptions> {
+    const result: AssignmentOptions = { members: [], teams: [], canAssign: false };
+    let cursor: string | null = null;
+    do {
+      const data: AssignmentOptions & { nextCursor: string | null } = (await httpsCallable<unknown, AssignmentOptions & { nextCursor: string | null }>(this.functions, "listAssignmentOptions")({ organizationId: this.organizationId, cursor })).data;
+      result.members.push(...data.members); result.teams = data.teams; result.canAssign = data.canAssign; cursor = data.nextCursor;
+    } while (cursor);
+    return result;
+  }
+  async history(collection: RecordCollection, recordId: string): Promise<RecordEvent[]> {
+    const events: RecordEvent[] = []; let cursor: string | null = null;
+    do {
+      const data: { events: RecordEvent[]; nextCursor: string | null } = (await httpsCallable<unknown, { events: RecordEvent[]; nextCursor: string | null }>(this.functions, "commercialRecordHistory")({ organizationId: this.organizationId, collection, recordId, cursor })).data;
+      events.push(...data.events); cursor = data.nextCursor;
+    } while (cursor);
+    return events.sort((a,b) => b.at.localeCompare(a.at));
+  }
+  async preferences(locale?: string) {
+    return (await httpsCallable<unknown, { locale: string | null }>(this.functions, "userPreferences")({ organizationId: this.organizationId, ...(locale ? { locale } : {}) })).data;
   }
 
   async createLead(input: LeadInput) {
     const callable = httpsCallable<
-      { organizationId: string; companyName: string; location: string; source: Lead["source"]; priority: Lead["priority"]; nextAction: string; nextActionAt: string },
+      { organizationId: string; teamId?: string | null; companyName: string; location: string; source: Lead["source"]; priority: Lead["priority"]; nextAction: string; nextActionAt: string },
       { lead: Lead }
     >(this.functions, "createCommercialLead");
     try {
-      const result = await callable({ organizationId: this.organizationId, companyName: input.companyName, location: input.location, source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: input.nextActionAt });
+      const result = await callable({ organizationId: this.organizationId, ...(input.teamId !== undefined ? { teamId: input.teamId } : {}), companyName: input.companyName, location: input.location, source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: input.nextActionAt });
       return { ok: true as const, lead: result.data.lead };
     } catch (error) {
       if ((error as { code?: string }).code === "functions/already-exists") return { ok: false as const, reason: "duplicate" as const };
@@ -191,13 +232,13 @@ export class FirebaseCommercialRepository implements CommercialRepository {
   }
 
   async createActivity(input: Omit<Activity, "id" | "completed">): Promise<Activity> {
-    const callable = httpsCallable<{ organizationId: string; kind: Activity["kind"]; subject: string; companyName: string; dueAt: string }, { activity: Activity }>(this.functions, "createCommercialActivity");
-    return (await callable({ organizationId: this.organizationId, kind: input.kind, subject: input.subject, companyName: input.companyName, dueAt: input.dueAt })).data.activity;
+    const callable = httpsCallable<{ organizationId: string; teamId?: string | null; kind: Activity["kind"]; subject: string; companyName: string; companyId?: string; dueAt: string }, { activity: Activity }>(this.functions, "createCommercialActivity");
+    return (await callable({ organizationId: this.organizationId, ...(input.teamId !== undefined ? { teamId: input.teamId } : {}), kind: input.kind, subject: input.subject, companyName: input.companyName, ...(input.companyId ? { companyId: input.companyId } : {}), dueAt: input.dueAt })).data.activity;
   }
 
   async createOpportunity(input: Omit<Opportunity, "id" | "stage" | "currency">): Promise<Opportunity> {
-    const callable = httpsCallable<{ organizationId: string; title: string; companyName: string; amountCents: number | null; nextAction: string; expectedCloseAt: string }, { opportunity: Opportunity }>(this.functions, "createCommercialOpportunity");
-    return (await callable({ organizationId: this.organizationId, title: input.title, companyName: input.companyName, amountCents: input.amountCents, nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt })).data.opportunity;
+    const callable = httpsCallable<{ organizationId: string; teamId?: string | null; title: string; companyName: string; companyId?: string; amountCents: number | null; nextAction: string; expectedCloseAt: string }, { opportunity: Opportunity }>(this.functions, "createCommercialOpportunity");
+    return (await callable({ organizationId: this.organizationId, ...(input.teamId !== undefined ? { teamId: input.teamId } : {}), title: input.title, companyName: input.companyName, ...(input.companyId ? { companyId: input.companyId } : {}), amountCents: input.amountCents, nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt })).data.opportunity;
   }
 
   async transitionOpportunity(id: string, stage: OpportunityStage): Promise<Opportunity> {

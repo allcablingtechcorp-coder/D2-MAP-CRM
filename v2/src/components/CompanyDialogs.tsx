@@ -1,3 +1,4 @@
+import { TeamSelector } from "./TeamSelector";
 import { useState, type FormEvent } from "react";
 import { Building2, UserPlus, X } from "lucide-react";
 import { useCrmWorkspace } from "../application/CrmWorkspaceLive";
@@ -6,6 +7,7 @@ import { useI18n } from "../i18n/i18n";
 export function CompanyDialog({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const workspace = useCrmWorkspace();
+  const [teamId, setTeamId] = useState<string | null | undefined>(undefined);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [industry, setIndustry] = useState("");
@@ -17,12 +19,12 @@ export function CompanyDialog({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     if (!name.trim() || !location.trim()) { setError(true); return; }
     setSaving(true); setError(false);
-    const result = await workspace.addCompany({ name: name.trim(), location: location.trim(), industry: industry.trim(), website: website.trim(), phone: phone.trim() });
+    const result = await workspace.addCompany({ ...(teamId !== undefined ? { teamId } : {}), name: name.trim(), location: location.trim(), industry: industry.trim(), website: website.trim(), phone: phone.trim() });
     setSaving(false);
     if (!result) { setError(true); return; }
     onClose();
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal commercial-modal" role="dialog" aria-modal="true" aria-labelledby="company-dialog-title"><header><div><span>{t("companies.eyebrow")}</span><h2 id="company-dialog-title">{t("companies.new")}</h2><p>{t("companies.createDescription")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19}/></button></header><form onSubmit={submit}><div className="dialog-grid"><label>{t("companies.name")}<input value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label><label>{t("leadDialog.location")}<input value={location} onChange={(event) => setLocation(event.target.value)} /></label><label>{t("companies.industry")}<input value={industry} onChange={(event) => setIndustry(event.target.value)} /></label><label>{t("companies.phone")}<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label className="span-two">{t("companies.website")}<input type="url" value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://" /></label></div>{error && <div className="governance-feedback error" role="alert">{t("workspace.remoteError")}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button" disabled={saving}><Building2 size={16}/>{t("companies.create")}</button></footer></form></section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal commercial-modal" role="dialog" aria-modal="true" aria-labelledby="company-dialog-title"><header><div><span>{t("companies.eyebrow")}</span><h2 id="company-dialog-title">{t("companies.new")}</h2><p>{t("companies.createDescription")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19}/></button></header><form onSubmit={submit}><div className="dialog-grid"><TeamSelector value={teamId} onChange={setTeamId}/><label>{t("companies.name")}<input value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label><label>{t("leadDialog.location")}<input value={location} onChange={(event) => setLocation(event.target.value)} /></label><label>{t("companies.industry")}<input value={industry} onChange={(event) => setIndustry(event.target.value)} /></label><label>{t("companies.phone")}<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label className="span-two">{t("companies.website")}<input type="url" value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://" /></label></div>{error && <div className="governance-feedback error" role="alert">{t("workspace.remoteError")}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button" disabled={saving}><Building2 size={16}/>{t("companies.create")}</button></footer></form></section></div>;
 }
 
 export function ContactDialog({ companyId, onClose }: { companyId?: string; onClose: () => void }) {

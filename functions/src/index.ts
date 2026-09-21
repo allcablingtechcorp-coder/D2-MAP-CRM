@@ -1,3 +1,7 @@
+import { object, exact, id as inputId } from "./lifecyclePolicy.js";
+import { FieldPath } from "firebase-admin/firestore";
+import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
+import { dateIso, serializeLead, serializeCompany, serializeContact, serializeActivity, serializeOpportunity } from "./commercialSerialization.js";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, Timestamp, getFirestore, type DocumentData, type Query, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -30,10 +34,11 @@ import { parseCreateInvitationCommand, parseCreateTeamCommand, parseOrganization
 initializeApp();
 
 const database = getFirestore();
-const callableOptions = { region: "us-central1", memory: "256MiB" as const, timeoutSeconds: 30, maxInstances: 3 };
+const callableOptions = crmCallableOptions;
 
 export const saveMembership = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   const authenticatedUser = request.auth;
 
   let input;
@@ -140,7 +145,12 @@ function requireRecordAccess(actor: Awaited<ReturnType<typeof commercialActor>>,
   if (!canAccessCommercialRecord(actor, uid, recordAccess(data))) throw new HttpsError("permission-denied", "This record is outside the assigned scope");
 }
 
-function defaultTeamId(actor: Awaited<ReturnType<typeof commercialActor>>): string | null {
+function defaultTeamId(actor: Awaited<ReturnType<typeof commercialActor>>, selected?: string | null): string | null {
+  if (selected !== undefined) {
+    if (actor.scope === "assigned_teams" && (!selected || !actor.teamIds?.includes(selected))) throw new HttpsError("permission-denied", "Select an assigned team");
+    if (selected && actor.scope !== "organization" && !actor.teamIds?.includes(selected)) throw new HttpsError("permission-denied", "Select an assigned team");
+    return selected;
+  }
   if (actor.scope !== "assigned_teams") return null;
   const teamId = actor.teamIds?.[0];
   if (!teamId) throw new HttpsError("failed-precondition", "A team-scoped member must be assigned to a team");
@@ -176,39 +186,9 @@ async function scopedDocuments(organizationId: string, collectionName: string, a
   return [...documents.values()];
 }
 
-function dateIso(value: unknown): string {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (typeof value === "string" && Number.isFinite(Date.parse(value))) return new Date(value).toISOString();
-  return new Date(0).toISOString();
-}
-
-function serializeLead(document: { id: string; data: DocumentData }) {
-  const data = document.data;
-  return { id: document.id, companyName: String(data.companyName ?? ""), location: String(data.location ?? ""), ownerName: String(data.ownerName ?? ""), qualification: String(data.qualification ?? "new"), source: String(data.source ?? "manual"), priority: String(data.priority ?? "medium"), nextAction: String(data.nextAction ?? ""), nextActionAt: dateIso(data.nextActionAt), lastActivityAt: dateIso(data.lastActivityAt) };
-}
-
-function serializeOpportunity(document: { id: string; data: DocumentData }) {
-  const data = document.data;
-  return { id: document.id, title: String(data.title ?? ""), companyName: String(data.companyName ?? ""), ownerName: String(data.ownerName ?? ""), stage: String(data.stage ?? "discovery"), amountCents: typeof data.amountCents === "number" ? data.amountCents : null, currency: "USD", nextAction: String(data.nextAction ?? ""), expectedCloseAt: String(data.expectedCloseAt ?? "") };
-}
-
-function serializeActivity(document: { id: string; data: DocumentData }) {
-  const data = document.data;
-  return { id: document.id, kind: String(data.kind ?? "note"), subject: String(data.subject ?? ""), companyName: String(data.companyName ?? ""), ownerName: String(data.ownerName ?? ""), dueAt: dateIso(data.dueAt), completed: data.completed === true };
-}
-
-function serializeCompany(document: { id: string; data: DocumentData }) {
-  const data = document.data;
-  return { id: document.id, name: String(data.name ?? ""), location: String(data.location ?? ""), ownerName: String(data.ownerName ?? ""), industry: String(data.industry ?? ""), website: String(data.website ?? ""), phone: String(data.phone ?? ""), createdAt: dateIso(data.createdAt) };
-}
-
-function serializeContact(document: { id: string; data: DocumentData }) {
-  const data = document.data;
-  return { id: document.id, companyId: String(data.companyId ?? ""), companyName: String(data.companyName ?? ""), name: String(data.name ?? ""), title: String(data.title ?? ""), email: String(data.email ?? ""), phone: String(data.phone ?? ""), ownerName: String(data.ownerName ?? ""), createdAt: dateIso(data.createdAt) };
-}
-
 export const loadCommercialWorkspace = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseOrganizationInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -231,6 +211,7 @@ export const loadCommercialWorkspace = onCall(callableOptions, async (request) =
 
 export const createCommercialLead = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateLeadInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -242,15 +223,17 @@ export const createCommercialLead = onCall(callableOptions, async (request) => {
   const companyReference = database.doc(`organizations/${input.organizationId}/companies/${id}`);
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.lead_created", "lead", id, "Lead created");
   const now = Timestamp.now();
-  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), companyName: input.companyName, companyNameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, locationNormalized: input.location.toLocaleLowerCase("en-US"), qualification: "new", source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: Timestamp.fromDate(new Date(input.nextActionAt)), lastActivityAt: now, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
+  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor, input.teamId), companyId: id, companyName: input.companyName, companyNameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, locationNormalized: input.location.toLocaleLowerCase("en-US"), qualification: "new", source: input.source, priority: input.priority, nextAction: input.nextAction, nextActionAt: Timestamp.fromDate(new Date(input.nextActionAt)), lastActivityAt: now, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
     await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    if (data.teamId && !(await transaction.get(database.doc(`organizations/${input.organizationId}/teams/${data.teamId}`))).exists) throw new HttpsError("failed-precondition", "Selected team does not exist");
     const [leadSnapshot, companySnapshot] = await Promise.all([transaction.get(reference), transaction.get(companyReference)]);
     if (leadSnapshot.exists) throw new HttpsError("already-exists", "A lead already exists for this company and location");
-    if (companySnapshot.exists) requireRecordAccess(actor, request.auth!.uid, companySnapshot.data()!);
+    if (companySnapshot.exists) { requireRecordAccess(actor, request.auth!.uid, companySnapshot.data()!); if (companySnapshot.data()!.archived) throw new HttpsError("failed-precondition", "Restore the company first"); }
     transaction.create(reference, data);
-    if (!companySnapshot.exists) transaction.create(companyReference, { organizationId: input.organizationId, ownerUid: request.auth!.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), name: input.companyName, nameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, industry: "", website: "", phone: "", createdByUid: request.auth!.uid, createdAt: now, updatedByUid: request.auth!.uid, updatedAt: now });
+    if (!companySnapshot.exists) transaction.create(companyReference, { organizationId: input.organizationId, ownerUid: request.auth!.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor, input.teamId), name: input.companyName, nameNormalized: input.companyName.toLocaleLowerCase("en-US"), location: input.location, industry: "", website: "", phone: "", createdByUid: request.auth!.uid, createdAt: now, updatedByUid: request.auth!.uid, updatedAt: now });
     transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
   });
   return { lead: serializeLead({ id, data }) };
 });
@@ -275,19 +258,21 @@ function invitationLock(organizationId: string, email: string) {
 
 export const listGovernanceDirectory = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
-  try { input = parseOrganizationCommand(request.data); }
+  try { const data = object(request.data); exact(data, ["organizationId", "collection", "cursor"]); if (data.collection !== undefined && !["invitations", "teams"].includes(String(data.collection))) throw new HttpsError("invalid-argument", "Invalid collection"); input = { organizationId: inputId(data.organizationId), collection: data.collection, cursor: data.cursor ? inputId(data.cursor) : "" }; }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const actor = await commercialActor(input.organizationId, request.auth.uid);
   if (!canReadGovernance(actor)) throw new HttpsError("permission-denied", "Administrative read access is required");
+  const pageQuery = (kind: string) => { const query = database.collection(`organizations/${input.organizationId}/${kind}`).orderBy(FieldPath.documentId()); return (input.cursor ? query.startAfter(input.cursor) : query).limit(201).get(); };
   const [invitationSnapshot, teamSnapshot, membershipSnapshot] = await Promise.all([
-    database.collection(`organizations/${input.organizationId}/invitations`).limit(200).get(),
-    database.collection(`organizations/${input.organizationId}/teams`).limit(200).get(),
+    input.collection === "teams" ? { docs: [] } : pageQuery("invitations"),
+    input.collection === "invitations" ? { docs: [] } : pageQuery("teams"),
     database.collection(`organizations/${input.organizationId}/memberships`).get(),
   ]);
   return {
-    invitations: invitationSnapshot.docs.map((document) => serializeInvitation(document.id, document.data())).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    teams: teamSnapshot.docs.map((document) => {
+    invitations: invitationSnapshot.docs.slice(0,200).map((document) => serializeInvitation(document.id, document.data())).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    teams: teamSnapshot.docs.slice(0,200).map((document) => {
       const data = document.data();
       return { id: document.id, organizationId: input.organizationId, name: String(data.name ?? ""), memberUids: membershipSnapshot.docs.filter((membership) => Array.isArray(membership.data().teamIds) && membership.data().teamIds.includes(document.id)).map((membership) => membership.id), createdAt: dateIso(data.createdAt) };
     }).sort((a, b) => a.name.localeCompare(b.name)),
@@ -296,6 +281,7 @@ export const listGovernanceDirectory = onCall(callableOptions, async (request) =
 
 export const createGovernanceTeam = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateTeamCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -316,6 +302,7 @@ export const createGovernanceTeam = onCall(callableOptions, async (request) => {
 
 export const createGovernanceInvitation = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateInvitationCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -348,6 +335,7 @@ export const createGovernanceInvitation = onCall(callableOptions, async (request
 
 export const acceptGovernanceInvitation = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseOrganizationCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -383,6 +371,7 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
 
 export const recordSessionEvent = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseSessionCommand(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -406,6 +395,7 @@ export const recordSessionEvent = onCall(callableOptions, async (request) => {
 
 export const createCommercialCompany = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateCompanyInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -416,17 +406,20 @@ export const createCommercialCompany = onCall(callableOptions, async (request) =
   const reference = database.doc(`organizations/${input.organizationId}/companies/${id}`);
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.company_created", "company", id, "Company created");
   const now = Timestamp.now();
-  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), name: input.name, nameNormalized: input.name.toLocaleLowerCase("en-US"), location: input.location, industry: input.industry, website: input.website, phone: input.phone, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
+  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor, input.teamId), name: input.name, nameNormalized: input.name.toLocaleLowerCase("en-US"), location: input.location, industry: input.industry, website: input.website, phone: input.phone, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
     await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    if (data.teamId && !(await transaction.get(database.doc(`organizations/${input.organizationId}/teams/${data.teamId}`))).exists) throw new HttpsError("failed-precondition", "Selected team does not exist");
     if ((await transaction.get(reference)).exists) throw new HttpsError("already-exists", "This company already exists");
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
   });
   return { company: serializeCompany({ id, data }) };
 });
 
 export const createCommercialContact = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateContactInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -437,6 +430,7 @@ export const createCommercialContact = onCall(callableOptions, async (request) =
   const companySnapshot = await companyReference.get();
   if (!companySnapshot.exists) throw new HttpsError("not-found", "Company was not found");
   const company = companySnapshot.data()!; requireRecordAccess(actor, request.auth.uid, company);
+  if (company.archived) throw new HttpsError("failed-precondition", "Restore the company first");
   const reference = database.collection(`organizations/${input.organizationId}/contacts`).doc();
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.contact_created", "contact", reference.id, "Contact created");
   const now = Timestamp.now();
@@ -446,12 +440,25 @@ export const createCommercialContact = onCall(callableOptions, async (request) =
     const currentCompany = await transaction.get(companyReference);
     if (!currentCompany.exists || JSON.stringify(recordAccess(currentCompany.data()!)) !== JSON.stringify(recordAccess(company))) throw new HttpsError("failed-precondition", "Company assignment changed; reload before retrying");
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
   });
   return { contact: serializeContact({ id: reference.id, data }) };
 });
 
+
+async function linkedCompany(transaction: Transaction, organizationId: string, uid: string, actor: Awaited<ReturnType<typeof commercialActor>>, input: { companyId?: string; companyName: string }) {
+  const base = database.collection(`organizations/${organizationId}/companies`);
+  const matches = input.companyId ? [await transaction.get(base.doc(input.companyId))] : (await transaction.get(base.where("name", "==", input.companyName).limit(2))).docs;
+  if (matches.length !== 1 || !matches[0]?.exists) throw new HttpsError("failed-precondition", "Select one existing company by ID");
+  const company = matches[0]!;
+  requireRecordAccess(actor, uid, company.data()!);
+  if (company.data()!.archived === true) throw new HttpsError("failed-precondition", "Restore the company first");
+  return { companyId: company.id, companyName: String(company.data()!.name) };
+}
+
 export const createCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateActivityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -460,16 +467,20 @@ export const createCommercialActivity = onCall(callableOptions, async (request) 
   const reference = database.collection(`organizations/${input.organizationId}/activities`).doc();
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.activity_created", "activity", reference.id, "Activity created");
   const now = Timestamp.now();
-  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), kind: input.kind, subject: input.subject, companyName: input.companyName, dueAt: Timestamp.fromDate(new Date(input.dueAt)), completed: false, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
+  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor, input.teamId), kind: input.kind, subject: input.subject, companyName: input.companyName, dueAt: Timestamp.fromDate(new Date(input.dueAt)), completed: false, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
     await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    if (data.teamId && !(await transaction.get(database.doc(`organizations/${input.organizationId}/teams/${data.teamId}`))).exists) throw new HttpsError("failed-precondition", "Selected team does not exist");
+    Object.assign(data, await linkedCompany(transaction, input.organizationId, request.auth!.uid, actor, input));
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
   });
   return { activity: serializeActivity({ id: reference.id, data }) };
 });
 
 export const createCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateOpportunityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -478,16 +489,20 @@ export const createCommercialOpportunity = onCall(callableOptions, async (reques
   const reference = database.collection(`organizations/${input.organizationId}/opportunities`).doc();
   const audit = auditDocument(input.organizationId, request.auth.uid, actor.email, "commercial.opportunity_created", "opportunity", reference.id, "Opportunity created");
   const now = Timestamp.now();
-  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor), title: input.title, companyName: input.companyName, stage: "discovery", amountCents: input.amountCents, currency: "USD", nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
+  const data = { organizationId: input.organizationId, ownerUid: request.auth.uid, ownerName: actor.displayName, teamId: defaultTeamId(actor, input.teamId), title: input.title, companyName: input.companyName, stage: "discovery", amountCents: input.amountCents, currency: "USD", nextAction: input.nextAction, expectedCloseAt: input.expectedCloseAt, createdByUid: request.auth.uid, createdAt: now, updatedByUid: request.auth.uid, updatedAt: now };
   await database.runTransaction(async (transaction) => {
     await revalidateActor(transaction, input.organizationId, request.auth!.uid, actor);
+    if (data.teamId && !(await transaction.get(database.doc(`organizations/${input.organizationId}/teams/${data.teamId}`))).exists) throw new HttpsError("failed-precondition", "Selected team does not exist");
+    Object.assign(data, await linkedCompany(transaction, input.organizationId, request.auth!.uid, actor, input));
     transaction.create(reference, data); transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
   });
   return { opportunity: serializeOpportunity({ id: reference.id, data }) };
 });
 
 export const transitionCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseTransitionOpportunityInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -500,12 +515,15 @@ export const transitionCommercialOpportunity = onCall(callableOptions, async (re
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("not-found", "Opportunity was not found");
     const data = snapshot.data()!; requireRecordAccess(actor, request.auth!.uid, data);
+    if (data.archived === true) throw new HttpsError("failed-precondition", "Restore the record first");
+    if (["won", "lost"].includes(String(data.stage))) { requireCommercialPermission(actor, "opportunity.reopen"); throw new HttpsError("failed-precondition", "Use the audited reopen operation with a reason"); }
     const currentStage = String(data.stage) as keyof typeof opportunityTransitions;
     if (!opportunityTransitions[currentStage]?.includes(input.stage)) throw new HttpsError("failed-precondition", "The opportunity transition is not allowed");
     if (["proposal", "negotiation", "won"].includes(input.stage) && (!(typeof data.amountCents === "number") || data.amountCents <= 0)) throw new HttpsError("failed-precondition", "An amount is required for this stage");
     transaction.update(reference, { stage: input.stage, updatedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, actor.email, "commercial.opportunity_stage_changed", "opportunity", input.recordId, `${currentStage} -> ${input.stage}`);
     transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
     result = serializeOpportunity({ id: snapshot.id, data: { ...data, stage: input.stage } });
   });
   return { opportunity: result };
@@ -513,6 +531,7 @@ export const transitionCommercialOpportunity = onCall(callableOptions, async (re
 
 export const completeCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseRecordCommandInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
@@ -525,11 +544,15 @@ export const completeCommercialActivity = onCall(callableOptions, async (request
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("not-found", "Activity was not found");
     const data = snapshot.data()!; requireRecordAccess(actor, request.auth!.uid, data);
+    if (data.archived === true) throw new HttpsError("failed-precondition", "Restore the record first");
     if (data.completed === true) { result = serializeActivity({ id: snapshot.id, data }); return; }
     transaction.update(reference, { completed: true, completedAt: FieldValue.serverTimestamp(), updatedByUid: request.auth!.uid, updatedAt: FieldValue.serverTimestamp() });
     const audit = auditDocument(input.organizationId, request.auth!.uid, actor.email, "commercial.activity_completed", "activity", input.recordId, "Activity completed");
     transaction.create(audit.reference, audit.data);
+    transaction.create(reference.collection("history").doc(audit.reference.id), audit.data);
     result = serializeActivity({ id: snapshot.id, data: { ...data, completed: true } });
   });
   return { activity: result };
 });
+
+export { loadCommercialPage, changeCommercialRecord, listAssignmentOptions, commercialRecordHistory, userPreferences } from "./commercialLifecycle.js";

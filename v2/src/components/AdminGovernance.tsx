@@ -1,3 +1,4 @@
+import { useLifecycleText } from "../i18n/lifecycle";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Clock3, History, LockKeyhole, MailPlus, Plus, ShieldCheck, UserPlus, UsersRound, X } from "lucide-react";
 import { demoMemberships } from "../data/demo";
@@ -51,6 +52,8 @@ function initials(name: string) {
 }
 
 export function AdminGovernance() {
+  const labels = useLifecycleText();
+  const [auditPage, setAuditPage] = useState(0);
   const { t, formatDateTime } = useI18n();
   const runtime = useRuntimeSession();
   const initialMembership = runtime.mode === "firebase" ? runtime.membership : demoMemberships[0];
@@ -178,8 +181,8 @@ export function AdminGovernance() {
     </Panel>}
 
     {tab === "audit" && <Panel title={t("admin.auditTitle")} description={t("admin.auditDescription")}>
-      <div className="audit-list">{audit.length === 0 ? <div className="empty-governance"><History size={28} /><strong>{t("admin.noAudit")}</strong></div> : audit.map((event) => <article key={event.id}><div className="audit-icon"><History size={16} /></div><div><strong>{t(event.summary as TranslationKey)}</strong><span>{event.actorEmail} · {event.targetId}</span>{event.reason && <small>{t("admin.reasonPrefix")}: {event.reason}</small>}</div><time><Clock3 size={13} />{formatDateTime(event.occurredAt)}</time></article>)}</div>
-    </Panel>}
+      <div className="audit-list">{audit.length === 0 ? <div className="empty-governance"><History size={28} /><strong>{t("admin.noAudit")}</strong></div> : audit.slice(auditPage*50, auditPage*50+50).map((event) => <article key={event.id}><div className="audit-icon"><History size={16} /></div><div><strong>{t(event.summary as TranslationKey)}</strong><span>{event.actorEmail} · {event.targetId}</span>{event.reason && <small>{t("admin.reasonPrefix")}: {event.reason}</small>}</div><time><Clock3 size={13} />{formatDateTime(event.occurredAt)}</time></article>)}</div>
+    <div className="toolbar"><button className="action-button secondary" disabled={auditPage===0} onClick={() => setAuditPage(auditPage-1)}>{labels.previous}</button><span>{Math.min(auditPage*50+1,audit.length)}–{Math.min((auditPage+1)*50,audit.length)} / {audit.length}</span><button className="action-button secondary" disabled={(auditPage+1)*50>=audit.length} onClick={() => setAuditPage(auditPage+1)}>{labels.next}</button></div></Panel>}
 
     {inviteOpen && <InviteDialog memberships={memberships} invitations={invitations} teams={teams} actor={actor} createRemote={runtime.mode === "firebase" ? (input) => runtime.memberships.createInvitation(input) : undefined} onClose={() => setInviteOpen(false)} onCreated={(invitation) => {
       setInvitations((items) => [invitation, ...items]);

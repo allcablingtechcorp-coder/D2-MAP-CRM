@@ -1,6 +1,7 @@
 import type { Activity, Lead, Opportunity, OpportunityStage } from "./crm";
 
 export interface LeadInput {
+  teamId?: string | null;
   companyName: string;
   location: string;
   ownerName: string;

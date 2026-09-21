@@ -1,8 +1,9 @@
+export interface RecordMetadata { ownerUid?: string; teamId?: string | null; companyId?: string; revision?: string; archived?: boolean; }
 export type LeadQualification = "new" | "contacting" | "qualified" | "nurturing" | "disqualified";
 export type OpportunityStage = "discovery" | "diagnosis" | "proposal" | "negotiation" | "won" | "lost";
 export type ActivityKind = "call" | "email" | "meeting" | "visit" | "note";
 
-export interface Lead {
+export interface Lead extends RecordMetadata {
   id: string;
   companyName: string;
   location: string;
@@ -15,7 +16,7 @@ export interface Lead {
   lastActivityAt: string;
 }
 
-export interface Opportunity {
+export interface Opportunity extends RecordMetadata {
   id: string;
   title: string;
   companyName: string;
@@ -27,7 +28,7 @@ export interface Opportunity {
   expectedCloseAt: string;
 }
 
-export interface Activity {
+export interface Activity extends RecordMetadata {
   id: string;
   kind: ActivityKind;
   subject: string;
@@ -35,9 +36,10 @@ export interface Activity {
   ownerName: string;
   dueAt: string;
   completed: boolean;
+  completedAt?: string;
 }
 
-export interface Company {
+export interface Company extends RecordMetadata {
   id: string;
   name: string;
   location: string;
@@ -48,7 +50,7 @@ export interface Company {
   createdAt: string;
 }
 
-export interface Contact {
+export interface Contact extends RecordMetadata {
   id: string;
   companyId: string;
   companyName: string;

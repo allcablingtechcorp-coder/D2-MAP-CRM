@@ -75,10 +75,10 @@ export function parseSaveMembershipInput(value: unknown): SaveMembershipInput {
   if (!isOneOf(role, roles)) throw new InputValidationError("patch.role is invalid");
   if (!isOneOf(status, statuses)) throw new InputValidationError("patch.status is invalid");
   if (!isOneOf(scope, scopes) || scope === "custom") throw new InputValidationError("patch.scope is invalid");
-  if (!Array.isArray(moduleValues) || moduleValues.length === 0 || moduleValues.some((item) => !isOneOf(item, modules))) {
+  if (!Array.isArray(moduleValues) || moduleValues.length === 0 || moduleValues.length > 8 || moduleValues.some((item) => !isOneOf(item, modules))) {
     throw new InputValidationError("patch.modules is invalid");
   }
-  if (!Array.isArray(teamIds) || teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item))) {
+  if (!Array.isArray(teamIds) || teamIds.length > 100 || teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item))) {
     throw new InputValidationError("patch.teamIds is invalid");
   }
   if (scope === "assigned_teams" && teamIds.length === 0) throw new InputValidationError("patch.teamIds requires at least one team for assigned_teams scope");
@@ -114,7 +114,7 @@ export function parseMembershipDocument(value: unknown): MembershipDocument {
   if (value.permissionOverrides !== undefined && (!isRecord(value.permissionOverrides) || Object.values(value.permissionOverrides).some((item) => typeof item !== "boolean"))) {
     throw new InputValidationError("Membership permission overrides are invalid");
   }
-  if (value.teamIds !== undefined && (!Array.isArray(value.teamIds) || value.teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item)))) {
+  if (value.teamIds !== undefined && (!Array.isArray(value.teamIds) || value.teamIds.length > 100 || value.teamIds.some((item) => typeof item !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(item)))) {
     throw new InputValidationError("Membership teams are invalid");
   }
 
