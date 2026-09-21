@@ -1,3 +1,7 @@
+import {CompanyAccessPanel} from "./CompanyAccessPanel";
+import {useCompany} from "../application/CompanyContext";
+import {businesses} from "../domain/businesses";
+import {useBusinessText} from "../i18n/businesses";
 import { useLifecycleText } from "../i18n/lifecycle";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Clock3, History, LockKeyhole, MailPlus, Plus, ShieldCheck, UserPlus, UsersRound, X } from "lucide-react";
@@ -52,6 +56,7 @@ function initials(name: string) {
 }
 
 export function AdminGovernance() {
+  const company=useCompany();
   const labels = useLifecycleText();
   const [auditPage, setAuditPage] = useState(0);
   const { t, formatDateTime } = useI18n();
@@ -84,13 +89,13 @@ export function AdminGovernance() {
     let active = true;
     setLoading(true);
     setLoadError(false);
-    Promise.all([runtime.memberships.list(), runtime.memberships.listAudit(), runtime.memberships.listGovernanceDirectory()])
+    Promise.all([runtime.memberships.list(), company.superAdmin&&company.groupMemberships ? Promise.all([runtime.memberships.listAudit(),company.groupMemberships.listAudit()]).then(lists=>lists.flat().sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt))) : runtime.memberships.listAudit(), (company.superAdmin&&company.groupMemberships?company.groupMemberships:runtime.memberships).listGovernanceDirectory()])
       .then(([loadedMemberships, loadedAudit, directory]) => {
         if (!active) return;
         setMemberships(loadedMemberships);
         setAudit(loadedAudit);
         setInvitations(directory.invitations);
-        setTeams(directory.teams);
+        if(company.superAdmin&&company.groupMemberships) void runtime.memberships.listGovernanceDirectory().then(d=>{if(active)setTeams(d.teams);}).catch(()=>{if(active)setLoadError(true);}); else setTeams(directory.teams);
         setSelectedUid((currentUid) => loadedMemberships.some((member) => member.uid === currentUid) ? currentUid : runtime.membership.uid);
       })
       .catch(() => { if (active) setLoadError(true); })
@@ -138,6 +143,7 @@ export function AdminGovernance() {
 
   return <>
     <PageHeader eyebrow={t("admin.eyebrow")} title={t("admin.title")} description={t("admin.description")} actions={actor.role === "owner" ? <button className="action-button" onClick={() => setInviteOpen(true)}><UserPlus size={17} /> {t("admin.invite")}</button> : undefined} />
+    {company.superAdmin&&<CompanyAccessPanel/>}
     <div className="admin-alert"><ShieldCheck size={21} /><div><strong>{t("admin.protectedOwner")}</strong><span>{t("admin.protectedDescription")}</span></div></div>
     <div className="governance-tabs" role="tablist" aria-label={t("admin.governanceAreas")}>
       <button className={tab === "members" ? "active" : ""} onClick={() => setTab("members")}><UsersRound size={16} />{t("admin.membersTab")}<span>{memberships.length}</span></button>
@@ -176,15 +182,15 @@ export function AdminGovernance() {
       setTeams((items) => [...items, team]);
     }} />}
 
-    {tab === "invitations" && <Panel title={t("admin.invitationsTitle")} description={t("admin.invitationsDescription")} action={<button className="action-button" onClick={() => setInviteOpen(true)}><MailPlus size={16} />{t("admin.newInvitation")}</button>}>
-      {invitations.length === 0 ? <div className="empty-governance"><MailPlus size={28} /><strong>{t("admin.noInvitations")}</strong><span>{t("admin.noInvitationsDescription")}</span></div> : <div className="governance-table-wrap"><table className="data-table"><thead><tr><th>{t("admin.email")}</th><th>{t("admin.assignedRole")}</th><th>{t("admin.dataScope")}</th><th>{t("admin.status")}</th><th>{t("admin.expires")}</th></tr></thead><tbody>{invitations.map((invite) => <tr key={invite.id}><td><strong>{invite.email}</strong></td><td>{t(roleKeys[invite.role])}</td><td>{t(scopeKeys[invite.scope])}</td><td><span className="member-status invited">{t(`audit.invitation.${invite.status}` as TranslationKey)}</span></td><td>{formatDateTime(invite.expiresAt)}</td></tr>)}</tbody></table></div>}
+    {tab === "invitations" && <Panel title={t("admin.invitationsTitle")} description={t("admin.invitationsDescription")} action={company.superAdmin ? <button className="action-button" onClick={() => setInviteOpen(true)}><MailPlus size={16} />{t("admin.newInvitation")}</button> : undefined}>
+      {invitations.length === 0 ? <div className="empty-governance"><MailPlus size={28} /><strong>{t("admin.noInvitations")}</strong><span>{t("admin.noInvitationsDescription")}</span></div> : <div className="governance-table-wrap"><table className="data-table"><thead><tr><th>{t("admin.email")}</th><th>{t("admin.assignedRole")}</th><th>{t("admin.dataScope")}</th><th>{t("admin.status")}</th><th>{t("admin.expires")}</th></tr></thead><tbody>{invitations.map((invite) => <tr key={invite.id}><td><strong>{invite.email}</strong></td><td>{t(roleKeys[invite.role])}</td><td>{t(scopeKeys[invite.scope])}<small>{invite.companyIds?.map(id=>businesses.find(b=>b.id===id)?.name).join(" · ")}</small></td><td><span className="member-status invited">{t(`audit.invitation.${invite.status}` as TranslationKey)}</span></td><td>{formatDateTime(invite.expiresAt)}</td></tr>)}</tbody></table></div>}
     </Panel>}
 
     {tab === "audit" && <Panel title={t("admin.auditTitle")} description={t("admin.auditDescription")}>
       <div className="audit-list">{audit.length === 0 ? <div className="empty-governance"><History size={28} /><strong>{t("admin.noAudit")}</strong></div> : audit.slice(auditPage*50, auditPage*50+50).map((event) => <article key={event.id}><div className="audit-icon"><History size={16} /></div><div><strong>{t(event.summary as TranslationKey)}</strong><span>{event.actorEmail} · {event.targetId}</span>{event.reason && <small>{t("admin.reasonPrefix")}: {event.reason}</small>}</div><time><Clock3 size={13} />{formatDateTime(event.occurredAt)}</time></article>)}</div>
     <div className="toolbar"><button className="action-button secondary" disabled={auditPage===0} onClick={() => setAuditPage(auditPage-1)}>{labels.previous}</button><span>{Math.min(auditPage*50+1,audit.length)}–{Math.min((auditPage+1)*50,audit.length)} / {audit.length}</span><button className="action-button secondary" disabled={(auditPage+1)*50>=audit.length} onClick={() => setAuditPage(auditPage+1)}>{labels.next}</button></div></Panel>}
 
-    {inviteOpen && <InviteDialog memberships={memberships} invitations={invitations} teams={teams} actor={actor} createRemote={runtime.mode === "firebase" ? (input) => runtime.memberships.createInvitation(input) : undefined} onClose={() => setInviteOpen(false)} onCreated={(invitation) => {
+    {inviteOpen && <InviteDialog memberships={memberships} invitations={invitations} teams={teams} actor={actor} createRemote={runtime.mode === "firebase" ? (input) => (company.groupMemberships??runtime.memberships).createInvitation(input) : undefined} onClose={() => setInviteOpen(false)} onCreated={(invitation) => {
       setInvitations((items) => [invitation, ...items]);
       setAudit((items) => [buildAuditEvent({ id: crypto.randomUUID(), organizationId: "d2-group", action: "membership.invited", actorUid: actor.uid, actorEmail: actor.email, targetType: "invitation", targetId: invitation.id, summary: "admin.auditInvitationCreated", occurredAt: new Date().toISOString() }), ...items]);
       setInviteOpen(false); setTab("invitations");
@@ -198,8 +204,11 @@ function TeamsPanel({ teams, memberships, canCreate, onCreate }: { teams: Team[]
   return <Panel title={t("admin.teamsTitle")} description={t("admin.teamsDescription")} action={canCreate ? <form className="team-create" onSubmit={submit}><input value={name} onChange={(event) => setName(event.target.value)} placeholder={t("admin.teamName")} /><button className="action-button" disabled={busy || !name.trim()}><Plus size={16} />{t("admin.createTeam")}</button></form> : undefined}>{error && <div className="governance-feedback error">{t("auth.operationError")}</div>}{teams.length === 0 ? <div className="empty-governance"><UsersRound size={28} /><strong>{t("admin.noTeams")}</strong></div> : <div className="team-grid">{teams.map((team) => <article key={team.id}><UsersRound size={20} /><div><strong>{team.name}</strong><span>{t("admin.teamMembers", { count: memberships.filter((member) => member.teamIds?.includes(team.id)).length })}</span><small>{formatDateTime(team.createdAt)}</small></div></article>)}</div>}</Panel>;
 }
 
-function InviteDialog({ memberships, invitations, teams, actor, createRemote, onClose, onCreated }: { memberships: Membership[]; invitations: Invitation[]; teams: Team[]; actor: Membership; createRemote?: (input: { email: string; role: Exclude<RoleId, "owner">; scope: AccessScope; modules: ModuleId[]; teamIds: string[] }) => Promise<Invitation>; onClose: () => void; onCreated: (invitation: Invitation) => void }) {
+function InviteDialog({ memberships, invitations, teams: _teams, actor, createRemote, onClose, onCreated }: { memberships: Membership[]; invitations: Invitation[]; teams: Team[]; actor: Membership; createRemote?: (input: { companyIds?:string[]; email: string; role: Exclude<RoleId, "owner">; scope: AccessScope; modules: ModuleId[]; teamIds: string[] }) => Promise<Invitation>; onClose: () => void; onCreated: (invitation: Invitation) => void }) {
   const { t } = useI18n();
+  const company=useCompany(),l=useBusinessText();
+  const [selectedCompanies,setSelectedCompanies]=useState<string[]>([company.active.id]);
+  const teams:Team[]=[];
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<RoleId>("sales_rep");
   const [scope, setScope] = useState<AccessScope>("assigned_records");
@@ -212,7 +221,7 @@ function InviteDialog({ memberships, invitations, teams, actor, createRemote, on
     if (scope === "assigned_teams" && teamIds.length === 0) { setErrorKey(reasonKeys.team_required); return; }
     const result = createInvitation(actor, { email, role, scope, modules: selectedModules }, memberships, new Date(), crypto.randomUUID(), "d2-group", invitations);
     if (!result.ok) { setErrorKey(reasonKeys[result.reason]); return; }
-    setBusy(true); try { onCreated(createRemote ? await createRemote({ email: result.value.email, role: result.value.role, scope: result.value.scope, modules: selectedModules, teamIds }) : { ...result.value, teamIds }); } catch { setErrorKey("auth.operationError"); } finally { setBusy(false); }
+    setBusy(true); try { onCreated(createRemote ? await createRemote({ email: result.value.email, role: result.value.role, scope: result.value.scope, modules: selectedModules, teamIds, companyIds:selectedCompanies }) : { ...result.value, teamIds }); } catch { setErrorKey("auth.operationError"); } finally { setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal" role="dialog" aria-modal="true" aria-labelledby="invite-title"><header><div><span>{t("admin.secureAccess")}</span><h2 id="invite-title">{t("admin.inviteTitle")}</h2><p>{t("admin.inviteDescription")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19} /></button></header><form onSubmit={submit}><label>{t("admin.email")}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="user@company.com" autoFocus /></label><label>{t("admin.assignedRole")}<select value={role} onChange={(event) => setRole(event.target.value as RoleId)}>{assignableRoles.map((item) => <option key={item} value={item}>{t(roleKeys[item])}</option>)}</select></label><label>{t("admin.dataScope")}<select value={scope} onChange={(event) => setScope(event.target.value as AccessScope)}>{scopes.map((item) => <option key={item} value={item}>{t(scopeKeys[item])}</option>)}</select></label><fieldset className="access-options"><legend>{t("admin.allowedModules")}</legend>{allModules.map((module) => <label key={module}><input type="checkbox" checked={selectedModules.includes(module)} onChange={() => setSelectedModules((items) => items.includes(module) ? items.filter((item) => item !== module) : [...items, module])} />{t(`nav.${module}` as TranslationKey)}</label>)}</fieldset>{teams.length > 0 && <fieldset className="access-options"><legend>{t("admin.assignedTeams")}</legend>{teams.map((team) => <label key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={() => setTeamIds((items) => items.includes(team.id) ? items.filter((item) => item !== team.id) : [...items, team.id])} />{team.name}</label>)}</fieldset>}<div className="invite-policy"><ShieldCheck size={17} /><span>{t("admin.invitePolicy")}</span></div>{errorKey && <div className="governance-feedback error" role="alert">{t(errorKey)}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button" disabled={busy || selectedModules.length === 0}><MailPlus size={16} />{t("admin.createInvitation")}</button></footer></form></section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}><section className="governance-modal" role="dialog" aria-modal="true" aria-labelledby="invite-title"><header><div><span>{t("admin.secureAccess")}</span><h2 id="invite-title">{t("admin.inviteTitle")}</h2><p>{t("admin.inviteDescription")}</p></div><button className="icon-button" onClick={onClose} aria-label={t("common.cancel")}><X size={19} /></button></header><form onSubmit={submit}><fieldset className="access-options"><legend>{l.invite}</legend>{businesses.map(b=><label key={b.id}><input type="checkbox" checked={selectedCompanies.includes(b.id)} onChange={()=>setSelectedCompanies(ids=>ids.includes(b.id)?ids.filter(id=>id!==b.id):[...ids,b.id])}/>{b.name}</label>)}</fieldset><label>{t("admin.email")}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="user@company.com" autoFocus /></label><label>{t("admin.assignedRole")}<select value={role} onChange={(event) => {const role=event.target.value as RoleId;setRole(role);if(role==="operations_admin"){setScope("organization");setSelectedModules(allModules);}}}>{assignableRoles.map((item) => <option key={item} value={item}>{t(roleKeys[item])}</option>)}</select></label><label>{t("admin.dataScope")}<select value={scope} onChange={(event) => setScope(event.target.value as AccessScope)}>{scopes.filter(item=>item!=="assigned_teams").map((item) => <option key={item} value={item}>{t(scopeKeys[item])}</option>)}</select></label><fieldset className="access-options"><legend>{t("admin.allowedModules")}</legend>{allModules.map((module) => <label key={module}><input type="checkbox" checked={selectedModules.includes(module)} onChange={() => setSelectedModules((items) => items.includes(module) ? items.filter((item) => item !== module) : [...items, module])} />{t(`nav.${module}` as TranslationKey)}</label>)}</fieldset>{teams.length > 0 && <fieldset className="access-options"><legend>{t("admin.assignedTeams")}</legend>{teams.map((team) => <label key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={() => setTeamIds((items) => items.includes(team.id) ? items.filter((item) => item !== team.id) : [...items, team.id])} />{team.name}</label>)}</fieldset>}<div className="invite-policy"><ShieldCheck size={17} /><span>{t("admin.invitePolicy")}</span></div>{errorKey && <div className="governance-feedback error" role="alert">{t(errorKey)}</div>}<footer><button type="button" className="action-button secondary" onClick={onClose}>{t("common.cancel")}</button><button type="submit" className="action-button" disabled={busy || selectedModules.length === 0 || selectedCompanies.length === 0}><MailPlus size={16} />{t("admin.createInvitation")}</button></footer></form></section></div>;
 }

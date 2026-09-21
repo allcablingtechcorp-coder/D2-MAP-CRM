@@ -400,3 +400,30 @@ button, input, select, textarea { font-family: inherit; }
 .prospect-detail,.prospect-map .google-map-surface { scroll-margin-top:90px; }
 .prospect-back { display:flex; align-items:center; gap:8px; background:none; border:0; padding:10px 0; color:#245cce; font:inherit; cursor:pointer; }
 @media(max-width:900px) { .prospecting-page[data-search-expanded="false"] .page-header { display:none; } }
+.company-selector { display:flex; align-items:center; gap:20px; margin:20px 34px 0; padding:14px 20px; border:1px solid #dce3ec; border-left:4px solid #bd963d; border-radius:12px; background:#fff; }
+.company-selector > img { width:180px; height:58px; object-fit:contain; }
+.company-selector label { display:grid; gap:4px; margin-left:auto; font-size:13px; color:#64748b; }
+.company-selector select { min-height:44px; border:1px solid #cbd5e1; border-radius:8px; padding:8px 34px 8px 12px; background:white; font-size:16px; color:#182230; font-weight:600; }
+.company-admin { margin-bottom:22px; }
+.company-admin .panel-header p { max-width:780px; line-height:1.5; }
+.business-cards { padding:18px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.business-cards button { display:flex; flex-direction:column; align-items:center; gap:14px; min-height:130px; border:2px solid #e2e8f0; border-radius:12px; background:white; padding:20px; color:#245cce; font-size:15px; }
+.business-cards button[aria-pressed=true] { border-color:#2563eb; background:#f5f9ff; }
+.business-cards img { width:min(240px,100%); height:65px; object-fit:contain; }
+.company-access-list { padding:0 20px 20px; }
+.company-access-row { padding:20px 0; border-top:1px solid #e2e8f0; display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:end; }
+.company-access-row small { display:block; color:#64748b; font-size:14px; overflow-wrap:anywhere; }
+.company-access-row fieldset { border:0; padding:0; display:grid; gap:12px; font-size:15px; }
+.company-access-row fieldset label { display:flex; gap:10px; align-items:center; min-height:36px; }
+.company-access-row input[type=checkbox],.report-company-selection input { width:20px; height:20px; accent-color:#2563eb; }
+.company-reason { display:grid; gap:6px; font-size:14px; }.company-reason input { font-size:16px; padding:10px; min-height:44px; border:1px solid #cbd5e1; border-radius:8px; }
+.report-company-selection { display:flex; flex-wrap:wrap; gap:14px; padding:18px; margin:0 0 22px; border:1px solid #dce3ec; border-radius:12px; background:white; }
+.report-company-selection legend { font-weight:700; font-size:16px; padding:0 8px; }
+.report-company-selection label { display:flex; align-items:center; gap:12px; min-height:68px; padding:8px 16px; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; }
+.report-company-selection img { width:174px; height:55px; object-fit:contain; }.report-company-selection small { width:100%; color:#64748b; font-size:14px; }
+.company-report-breakdown { margin-bottom:22px; }.company-report-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:18px; padding:20px; }
+.company-report-cards article { border:1px solid #e2e8f0; border-radius:10px; padding:18px; }.company-report-cards img { width:200px; height:63px; object-fit:contain; max-width:100%; }.company-report-cards dl { margin:14px 0 0; }.company-report-cards dl div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; font-size:15px; }.company-report-cards dd { margin:0; font-weight:700; }
+@media(max-width:900px) { .company-selector { margin:14px 16px 0; padding:12px; gap:12px; }.company-selector > img { width:120px; height:42px; }.company-selector label { min-width:0; }.company-selector select { width:100%; font-size:16px; padding-right:20px; }.business-cards { gap:10px; padding:12px; }.business-cards button { padding:12px; }.company-access-row { grid-template-columns:1fr; }.report-company-selection label { flex:1; }.company-report-cards { grid-template-columns:1fr; } }
+.company-selector { position:sticky; top:70px; z-index:8; }
+@media(max-width:900px) { .company-selector { top:66px; } }
+@media(max-width:420px) { .company-selector > img { width:90px; height:38px; }.company-selector label { flex:1; }.company-selector label > span { display:none; }.business-cards { grid-template-columns:1fr; } }

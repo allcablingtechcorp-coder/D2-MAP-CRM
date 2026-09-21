@@ -10,9 +10,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/organizations/$(organizationId)/memberships/$(request.auth.uid));
     }
 
+    function companyGrant(organizationId) {
+      return !(organizationId in ["d2-smart-home", "d2-hvac-solutions"]) || (actorMembership("d2-group").data.status == "active" && organizationId in actorMembership("d2-group").data.get("companyIds", []));
+    }
+
     function isActiveMember(organizationId) {
       return signedIn()
-        && actorMembership(organizationId).data.status == "active";
+        && actorMembership(organizationId).data.status == "active" && companyGrant(organizationId);
     }
 
     function isActiveAdministrator(organizationId) {
@@ -22,7 +26,7 @@ service cloud.firestore {
     }
 
     function canReadGovernance(organizationId, permission) {
-      return isActiveAdministrator(organizationId)
+      return (organizationId != "d2-group" || actorMembership(organizationId).data.role == "owner") && isActiveAdministrator(organizationId)
         && actorMembership(organizationId).data.get("permissionOverrides", {}).get(permission, true) == true;
     }
 
@@ -31,7 +35,7 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
 
       match /memberships/{uid} {
-        allow get: if signedIn() && (request.auth.uid == uid || canReadGovernance(organizationId, "membership.read"));
+        allow get: if signedIn() && ((request.auth.uid == uid && companyGrant(organizationId)) || canReadGovernance(organizationId, "membership.read"));
         allow list: if canReadGovernance(organizationId, "membership.read");
         allow create, update, delete: if false;
       }
