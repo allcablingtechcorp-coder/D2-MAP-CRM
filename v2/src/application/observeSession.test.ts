@@ -21,6 +21,14 @@ function harness() {
 }
 
 describe("live session authorization", () => {
+  it("keeps the workspace mounted on duplicate same-account auth events without losing revocation", () => {
+    const h = harness(); h.emitIdentity(identity); h.emitMembership(membership);
+    h.state.mockClear(); h.closeMembership.mockClear();
+    h.emitIdentity({ ...identity });
+    expect(h.state).not.toHaveBeenCalled(); expect(h.closeMembership).not.toHaveBeenCalled();
+    h.emitMembership({ ...membership, status: "suspended" });
+    expect(h.state.mock.lastCall?.[0].status).toBe("access_blocked");
+  });
   it("blocks an open workspace immediately when the membership is suspended or removed", () => {
     const h = harness(); h.emitIdentity(identity); h.emitMembership(membership);
     expect(h.state.mock.lastCall?.[0].status).toBe("authenticated");

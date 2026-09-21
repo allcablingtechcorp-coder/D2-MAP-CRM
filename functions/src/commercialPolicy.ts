@@ -83,14 +83,14 @@ const rolePermissions: Record<RoleId, ReadonlySet<CommercialPermission>> = {
 const permissionModules: Record<CommercialPermission, readonly string[]> = {
   "lead.update": ["leads", "companies"],
   "opportunity.reopen": ["pipeline"],
-  "lead.read": ["dashboard", "leads", "companies", "reports"],
+  "lead.read": ["dashboard", "leads", "companies", "reports", "prospecting"],
   "lead.create": ["leads", "companies", "prospecting"],
   "lead.assign": ["leads", "companies"],
   "opportunity.read": ["dashboard", "pipeline", "companies", "reports"],
   "opportunity.update": ["pipeline"],
   "opportunity.close": ["pipeline"],
-  "activity.read": ["dashboard", "activities", "companies", "reports"],
-  "activity.create": ["activities"],
+  "activity.read": ["dashboard", "activities", "companies", "reports", "prospecting"],
+  "activity.create": ["activities", "prospecting"],
 };
 
 const stages = ["discovery", "diagnosis", "proposal", "negotiation", "won", "lost"] as const;

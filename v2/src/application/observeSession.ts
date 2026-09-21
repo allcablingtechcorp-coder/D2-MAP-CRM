@@ -3,8 +3,13 @@ import { resolveSession, type AuthGateway, type AuthIdentity, type MembershipRep
 // Never let a previous account's pending listener restore access after logout.
 export function observeSession(auth: AuthGateway, memberships: MembershipRepository, onSession: (state: SessionState) => void, onError: (identity: AuthIdentity | null) => void): () => void {
   let revision = 0;
+  let observedUid: string | null = null;
   let unsubscribeMembership = () => {};
   const unsubscribeAuth = auth.observeIdentity((identity) => {
+    // Same-account auth notifications must not tear down the verified workspace.
+    // The existing membership listener continues to enforce suspension/revocation.
+    if (identity && identity.uid === observedUid) return;
+    observedUid = identity?.uid ?? null;
     const current = ++revision;
     unsubscribeMembership();
     unsubscribeMembership = () => {};

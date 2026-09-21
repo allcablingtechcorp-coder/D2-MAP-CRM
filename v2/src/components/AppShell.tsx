@@ -128,7 +128,7 @@ export function AppShell({
                 </button>
               ))}
             </div>
-            <span className="environment-badge">{environmentLabel ?? t("shell.prototype")}</span>
+            {environmentLabel && <span className="environment-badge">{environmentLabel}</span>}
 
           </div>
         </header>

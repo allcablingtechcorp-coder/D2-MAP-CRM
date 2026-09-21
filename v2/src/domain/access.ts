@@ -176,7 +176,7 @@ export function canPerformCommercialAction(membership: Membership | null, permis
   const modules: Partial<Record<Permission, ModuleId[]>> = {
     "lead.create": ["leads", "companies", "prospecting"],
     "opportunity.update": ["pipeline"], "opportunity.close": ["pipeline"],
-    "activity.create": ["activities"], "report.export": ["reports"],
+    "activity.create": ["activities", "prospecting"], "report.export": ["reports"],
   };
   return hasPermission(membership, permission) && (modules[permission] ?? []).some((module) => canAccessModule(membership, module));
 }

@@ -170,8 +170,8 @@ export function App() {
     onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}
     availableModules={availableModules}
     account={mode === "firebase" ? { displayName: identity.displayName, photoUrl: identity.photoUrl, detail: t(`role.${membership.role}` as TranslationKey) } : undefined}
-    environmentLabel={mode === "firebase" ? t("shell.secureWorkspace") : undefined}
+    environmentLabel={mode === "demo" ? t("shell.prototype") : undefined}
     onSignOut={runtime.mode === "firebase" ? runtime.signOut : undefined}
     sessionError={runtime.mode === "firebase" ? runtime.actionError : false}
-  ><LocaleSync/>{mode === "firebase" && resolvedModule !== "admin" && <div className="workflow-feedback" role="note">{t("workspace.liveNotice")}</div>}{Page ? <Page key={resolvedModule} /> : <div className="empty-governance"><strong>{t("auth.noModulesTitle")}</strong><span>{t("auth.noModulesDescription")}</span></div>}</AppShell>;
+  ><LocaleSync/>{Page ? <Page key={resolvedModule} /> : <div className="empty-governance"><strong>{t("auth.noModulesTitle")}</strong><span>{t("auth.noModulesDescription")}</span></div>}</AppShell>;
 }

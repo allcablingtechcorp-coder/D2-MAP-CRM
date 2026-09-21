@@ -200,4 +200,49 @@ describe.skipIf(!enabled)("callable transactions against the Firestore emulator"
     await writer.close();
     await expect(api.loadCommercialWorkspace.run(request("rep", {}))).rejects.toMatchObject({ code: "resource-exhausted" });
   });
+
+  it("atomically schedules a mapped lead, deduplicates retries and records the actual visitor", async () => {
+    await org().collection("memberships").doc("rep").update({modules:[...member.modules,"prospecting"]});
+    await org().collection("memberships").doc("owner").update({modules:[...owner.modules,"prospecting"]});
+    const plan={requestId:"visit-request",action:"plan",placeId:"google-place",name:"Office",location:"Boca",position:{lat:26,lng:-80},at:new Date(Date.now()+86400000).toISOString(),note:"Meet facilities"};
+    const [first,second]=await Promise.all([api.saveProspectingVisit.run(request("rep",plan)),api.saveProspectingVisit.run(request("rep",plan))]);
+    expect(first).toEqual(second);expect((await org().collection("leads").get()).size).toBe(1);expect((await org().collection("activities").get()).size).toBe(1);
+    const at=new Date(Date.now()-3600000).toISOString();
+    const complete={...plan,requestId:"complete-request",action:"complete",leadId:first.leadId,activityId:first.activityId,at,note:"Met the buyer"};
+    await api.saveProspectingVisit.run(request("owner",complete));
+    await api.saveProspectingVisit.run(request("owner",complete));
+    const loaded=await api.loadCommercialPage.run(request("owner",{collection:"activities"}));
+    expect(loaded.records[0]).toMatchObject({completed:true,ownerName:"Rep",completedByName:"Owner",completedAt:at,visitNote:"Met the buyer"});
+    expect((await org().collection("leads").doc(first.leadId).collection("history").get()).size).toBe(2);
+    expect((await api.loadCommercialPage.run(request("rep",{collection:"leads"}))).records[0]).toMatchObject({placeId:"google-place",position:{lat:26,lng:-80}});
+    await api.saveProspectingVisit.run(request("owner",{...complete,requestId:"manager-revisit",activityId:undefined}));
+    const visits=(await api.loadCommercialPage.run(request("rep",{collection:"activities"}))).records;
+    expect(visits).toHaveLength(2);
+    expect(visits.every(visit=>visit.ownerName==="Rep"&&visit.completedByName==="Owner")).toBe(true);
+  });
+
+  it("rejects forged visitors, another seller's place, archived leads and future completed visits", async () => {
+    await org().collection("memberships").doc("rep").update({modules:[...member.modules,"prospecting"]});
+    await org().collection("memberships").doc("other").set({...member,modules:[...member.modules,"prospecting"]});
+    const data={requestId:"initial",action:"save",placeId:"private-place",name:"Private",location:"FL",position:{lat:26,lng:-80}};
+    const saved=await api.saveProspectingVisit.run(request("rep",data));
+    await expect(api.saveProspectingVisit.run(request("other",{...data,requestId:"steal",action:"plan"}))).rejects.toMatchObject({code:"permission-denied"});
+    await expect(api.saveProspectingVisit.run(request("rep",{...data,completedByName:"Someone else"}))).rejects.toMatchObject({code:"invalid-argument"});
+    await expect(api.saveProspectingVisit.run(request("rep",{...data,requestId:"future",action:"complete",at:new Date(Date.now()+86400000).toISOString()}))).rejects.toMatchObject({code:"invalid-argument"});
+    await org().collection("leads").doc(saved.leadId).update({archived:true});
+    await expect(api.saveProspectingVisit.run(request("rep",{...data,requestId:"archived",action:"plan"}))).rejects.toMatchObject({code:"failed-precondition"});
+    expect((await org().collection("activities").get()).empty).toBe(true);
+  });
+
+  it("keeps a mapped place linked after a company rename and supports prospecting-only scopes", async () => {
+    await org().collection("memberships").doc("rep").update({modules:["prospecting"]});
+    const data={requestId:"save",action:"save",placeId:"stable-place",name:"Original",location:"FL",position:{lat:26,lng:-80}};
+    const saved=await api.saveProspectingVisit.run(request("rep",data));
+    await api.saveProspectingVisit.run(request("rep",{...data,requestId:"revisit",action:"plan",name:"Renamed"}));
+    const leads=await api.loadCommercialPage.run(request("rep",{collection:"leads"}));
+    expect(leads.records).toHaveLength(1);expect(leads.records[0].id).toBe(saved.leadId);
+    expect((await api.loadCommercialPage.run(request("rep",{collection:"activities"}))).records).toHaveLength(1);
+    await org().collection("memberships").doc("rep").update({status:"suspended"});
+    await expect(api.saveProspectingVisit.run(request("rep",{...data,requestId:"blocked"}))).rejects.toMatchObject({code:"permission-denied"});
+  });
 });
