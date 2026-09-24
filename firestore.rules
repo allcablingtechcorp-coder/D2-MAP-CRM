@@ -11,13 +11,13 @@ service cloud.firestore {
     }
 
     function portalTokenMode() {
-      return request.auth.token.firebase.sign_in_provider == "custom"
+      return request.auth.token.get("firebase", {}).get("sign_in_provider", "") == "custom"
         || request.auth.token.get("portal_bridge", false) == true;
     }
 
     function portalAllowed(organizationId, allowGroup) {
       return !portalTokenMode() || (
-        request.auth.token.firebase.sign_in_provider == "custom"
+        request.auth.token.get("firebase", {}).get("sign_in_provider", "") == "custom"
         && request.auth.token.get("portal_bridge", false) == true
         && request.auth.token.get("portal_until", 0) is int
         && request.time.toMillis() < request.auth.token.portal_until * 1000
