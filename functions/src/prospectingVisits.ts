@@ -2,7 +2,7 @@ import { requireCommercialNamespace, requireGroupAccess } from "./companyWorkspa
 import { createHash } from "node:crypto";
 import { getFirestore, Timestamp, type DocumentData } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
+import { crmCallableOptions, consumeRequestBudget, assertPortalLease } from "./requestProtection.js";
 import { object, exact, id } from "./lifecyclePolicy.js";
 import { parseMembershipDocument } from "./membershipPolicy.js";
 import { canUseCommercialPermission, canAccessCommercialRecord } from "./commercialPolicy.js";
@@ -17,6 +17,7 @@ function text(value: unknown, max: number, optional = false) {
 // Save the place, lead and visit together. A request ID makes retry safe.
 export const saveProspectingVisit = onCall(crmCallableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   const uid = request.auth.uid;
   await consumeRequestBudget(uid);
   requireCommercialNamespace(String(request.data?.organizationId));

@@ -13,6 +13,7 @@ import { type AuthGateway, type AuthIdentity, type MembershipRepository, type Se
 import { observeSession } from "./observeSession";
 import { LanguageFlag } from "../components/LanguageFlag";
 import { PortalReturnLink } from "../components/PortalReturnLink";
+import { portalEmbedCompany, requestPortalToken } from "./portalHandoff";
 import type { CommercialRepository } from "./commercial";
 
 type RuntimeSession =
@@ -68,6 +69,25 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
   const [completingEmailLink,setCompletingEmailLink]=useState(()=>auth.isEmailLink?.()??false);
   const [sessionLogError, setSessionLogError] = useState(false);
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
+  const [bridgeState, setBridgeState] = useState<"none" | "pending" | "ready" | "failed">(() => portalEmbedCompany(window.location.search) ? "pending" : "none");
+
+  useEffect(() => {
+    const company = portalEmbedCompany(window.location.search);
+    if (!company || !auth.signInFromPortal) return;
+    let active = true;
+    const connect = async () => {
+      try {
+        const token = await requestPortalToken(company);
+        await auth.signInFromPortal!(token, company);
+        if (active) setBridgeState("ready");
+      } catch {
+        if (active) setBridgeState("failed");
+      }
+    };
+    void connect();
+    const interval = window.setInterval(() => { if (active) void connect(); }, 10 * 60 * 1000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, [auth]);
 
   useEffect(() => observeSession(auth, memberships, (state) => {
     setActionError(false);
@@ -95,6 +115,8 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
     finally { setAcceptingInvitation(false); }
   };
 
+  if (bridgeState === "pending") return <SessionScreen state="loading" />;
+  if (bridgeState === "failed") return <SessionScreen state="bridge_error" />;
   if(completingEmailLink || session.status === "signed_out")return <EmailAccess auth={auth} completing={completingEmailLink} onComplete={()=>setCompletingEmailLink(false)} onGoogle={async()=>{await auth.signInWithGoogle();}}/>;
   if (lookupErrorIdentity) return <SessionScreen state="lookup_error" identity={lookupErrorIdentity} onPrimaryAction={signOut} error={actionError} />;
   if (session.status === "loading") return <SessionScreen state="loading" error={actionError} />;
@@ -117,7 +139,9 @@ function DemoCompanyBoundary({children}:{children:ReactNode}) {
 }
 type FirebaseSession=Extract<RuntimeSession,{mode:"firebase"}>;
 function CompanyBoundary({group,forCompany,companyAccess,children}:{group:FirebaseSession;forCompany:(id:string)=>CompanyScopeRepositories;companyAccess:CompanyAccessRepository;children:ReactNode}) {
-  const l=useBusinessText(),{t}=useI18n(),available=authorizedBusinesses(group.membership.companyIds);
+  const l=useBusinessText(),{t}=useI18n(),portalCompany=portalEmbedCompany(window.location.search);
+  const permitted=authorizedBusinesses(group.membership.companyIds);
+  const available=portalCompany?permitted.filter(b=>businessQueryValue(b.id)===portalCompany):permitted;
   const storageKey=`d2-company:${group.identity.uid}`;
   const [selected,setSelected]=useState<string>(()=>{try{return preferredBusinessId(window.location.search,localStorage.getItem(storageKey));}catch{return preferredBusinessId(window.location.search,null);}});
   const active=available.find(b=>b.id===selected)??available[0];
@@ -125,7 +149,7 @@ function CompanyBoundary({group,forCompany,companyAccess,children}:{group:Fireba
   const select=(id:BusinessId)=>{if(!available.some(b=>b.id===id))return;setSelected(id);try{localStorage.setItem(storageKey,id);}catch{/* Selection still works without storage. */}const url=new URL(window.location.href);if(url.searchParams.has("company")){url.searchParams.set("company",businessQueryValue(id));window.history.replaceState(window.history.state,"",url);}};
   const scopes=useMemo(()=>Object.fromEntries(businesses.map(b=>[b.id,forCompany(b.id)])),[forCompany]);
   if(!active)return <div className="session-page"><section className="session-card"><Brand/><p>{l.none}</p><button className="action-button" onClick={group.signOut}>{t("auth.signOut")}</button></section></div>;
-  return <CompanyContext.Provider value={{active,available,select,superAdmin:group.membership.role==="owner",groupMemberships:group.memberships,access:companyAccess,repositories:id=>scopes[id]}}><CompanySession key={active.id} group={group} scope={scopes[active.id]} organizationId={active.id}>{children}</CompanySession></CompanyContext.Provider>;
+  return <CompanyContext.Provider value={{active,available,select,superAdmin:!portalCompany&&group.membership.role==="owner",groupMemberships:portalCompany?undefined:group.memberships,access:portalCompany?undefined:companyAccess,repositories:id=>scopes[id]}}><CompanySession key={active.id} group={group} scope={scopes[active.id]} organizationId={active.id}>{children}</CompanySession></CompanyContext.Provider>;
 }
 function CompanySession({group,scope,organizationId,children}:{group:FirebaseSession;scope:CompanyScopeRepositories;organizationId:string;children:ReactNode}) {
   const l=useBusinessText(),{t}=useI18n(); const [membership,setMembership]=useState<Membership|null>(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
@@ -135,7 +159,7 @@ function CompanySession({group,scope,organizationId,children}:{group:FirebaseSes
   return <RuntimeSessionContext.Provider value={{...group,...scope,membership,organizationId}}>{children}</RuntimeSessionContext.Provider>;
 }
 
-type SessionScreenState = "loading" | "signed_out" | "membership_required" | "access_blocked" | "configuration_error" | "lookup_error";
+type SessionScreenState = "loading" | "signed_out" | "membership_required" | "access_blocked" | "configuration_error" | "lookup_error" | "bridge_error";
 
 function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
@@ -143,10 +167,11 @@ function LanguageSwitcher() {
 }
 
 function SessionScreen({ state, identity, onPrimaryAction, onSecondaryAction, busy = false, error = false }: { state: SessionScreenState; identity?: AuthIdentity; onPrimaryAction?: () => void; onSecondaryAction?: () => void; busy?: boolean; error?: boolean }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const blocked = state === "membership_required" || state === "access_blocked" || state === "configuration_error" || state === "lookup_error";
-  const title = state === "signed_out" ? t("auth.signInTitle") : state === "membership_required" ? t("auth.membershipRequiredTitle") : state === "access_blocked" ? t("auth.accessBlockedTitle") : state === "configuration_error" ? t("auth.configurationErrorTitle") : state === "lookup_error" ? t("auth.lookupErrorTitle") : t("auth.loadingTitle");
-  const description = state === "signed_out" ? t("auth.signInDescription") : state === "membership_required" ? t("auth.membershipRequiredDescription") : state === "access_blocked" ? t("auth.accessBlockedDescription") : state === "configuration_error" ? t("auth.configurationErrorDescription") : state === "lookup_error" ? t("auth.lookupErrorDescription") : t("auth.loadingDescription");
+  const bridgeCopy = { en: ["CRM connection unavailable", "Return to the D2 Portal and try again."], pt: ["Conexão do CRM indisponível", "Volte ao Portal D2 e tente novamente."], es: ["Conexión de CRM no disponible", "Vuelve al Portal D2 e inténtalo de nuevo."] }[locale];
+  const title = state === "bridge_error" ? bridgeCopy[0] : state === "signed_out" ? t("auth.signInTitle") : state === "membership_required" ? t("auth.membershipRequiredTitle") : state === "access_blocked" ? t("auth.accessBlockedTitle") : state === "configuration_error" ? t("auth.configurationErrorTitle") : state === "lookup_error" ? t("auth.lookupErrorTitle") : t("auth.loadingTitle");
+  const description = state === "bridge_error" ? bridgeCopy[1] : state === "signed_out" ? t("auth.signInDescription") : state === "membership_required" ? t("auth.membershipRequiredDescription") : state === "access_blocked" ? t("auth.accessBlockedDescription") : state === "configuration_error" ? t("auth.configurationErrorDescription") : state === "lookup_error" ? t("auth.lookupErrorDescription") : t("auth.loadingDescription");
 
   return <main className="session-page"><header><div className="session-header-start"><PortalReturnLink /><Brand inverse subtitle={t("brand.subtitle")} /></div><LanguageSwitcher /></header><section className="session-card">{blocked ? <ShieldAlert size={28} /> : <ShieldCheck size={28} />}<span className="eyebrow">{t("auth.eyebrow")}</span><h1>{title}</h1><p>{description}</p>{identity && <div className="session-identity"><strong>{identity.displayName}</strong><span>{identity.email}</span></div>}{error && <div className="session-error" role="alert">{t("auth.operationError")}</div>}{state === "signed_out" && <button className="action-button" onClick={onPrimaryAction} disabled={busy}><LogIn size={17} />{busy ? t("auth.signingIn") : t("auth.signInGoogle")}</button>}{state === "membership_required" && <button className="action-button" onClick={onSecondaryAction} disabled={busy}><ShieldCheck size={17} />{busy ? t("auth.acceptingInvitation") : t("auth.acceptInvitation")}</button>}{(state === "membership_required" || state === "access_blocked" || state === "lookup_error") && <button className="action-button secondary" onClick={onPrimaryAction}><LogOut size={17} />{t("auth.signOut")}</button>}</section></main>;
 }

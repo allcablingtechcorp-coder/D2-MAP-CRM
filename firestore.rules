@@ -10,12 +10,33 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/organizations/$(organizationId)/memberships/$(request.auth.uid));
     }
 
+    function portalTokenMode() {
+      return request.auth.token.get("firebase", {}).get("sign_in_provider", "") == "custom"
+        || request.auth.token.get("portal_bridge", false) == true;
+    }
+
+    function portalAllowed(organizationId, allowGroup) {
+      return !portalTokenMode() || (
+        request.auth.token.get("firebase", {}).get("sign_in_provider", "") == "custom"
+        && request.auth.token.get("portal_bridge", false) == true
+        && request.auth.token.get("portal_until", 0) is int
+        && request.time.toMillis() < request.auth.token.portal_until * 1000
+        && (
+          (request.auth.token.get("portal_company", "") == "smart" && organizationId == "d2-smart-home")
+          || (request.auth.token.get("portal_company", "") == "hvac" && organizationId == "d2-hvac-solutions")
+          || (allowGroup && organizationId == "d2-group")
+        )
+      );
+    }
+
     function companyGrant(organizationId) {
-      return !(organizationId in ["d2-smart-home", "d2-hvac-solutions"]) || (actorMembership("d2-group").data.status == "active" && organizationId in actorMembership("d2-group").data.get("companyIds", []));
+      return portalAllowed(organizationId, true)
+        && (!(organizationId in ["d2-smart-home", "d2-hvac-solutions"]) || (actorMembership("d2-group").data.status == "active" && organizationId in actorMembership("d2-group").data.get("companyIds", [])));
     }
 
     function isActiveMember(organizationId) {
       return signedIn()
+        && portalAllowed(organizationId, true)
         && actorMembership(organizationId).data.status == "active" && companyGrant(organizationId);
     }
 
@@ -26,7 +47,7 @@ service cloud.firestore {
     }
 
     function canReadGovernance(organizationId, permission) {
-      return (organizationId != "d2-group" || actorMembership(organizationId).data.role == "owner") && isActiveAdministrator(organizationId)
+      return (organizationId != "d2-group" || (!portalTokenMode() && actorMembership(organizationId).data.role == "owner")) && isActiveAdministrator(organizationId)
         && actorMembership(organizationId).data.get("permissionOverrides", {}).get(permission, true) == true;
     }
 
@@ -35,7 +56,7 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
 
       match /memberships/{uid} {
-        allow get: if signedIn() && ((request.auth.uid == uid && companyGrant(organizationId)) || canReadGovernance(organizationId, "membership.read"));
+        allow get: if signedIn() && portalAllowed(organizationId, true) && ((request.auth.uid == uid && companyGrant(organizationId)) || canReadGovernance(organizationId, "membership.read"));
         allow list: if canReadGovernance(organizationId, "membership.read");
         allow create, update, delete: if false;
       }
