@@ -15,6 +15,10 @@ const rulesPath = fileURLToPath(new URL("../firestore.rules", import.meta.url));
 
 let environment: RulesTestEnvironment;
 
+function normalContext(uid: string) {
+  return environment.authenticatedContext(uid, { firebase: { sign_in_provider: "password" } }).firestore();
+}
+
 function membershipPath(uid: string): string {
   return `organizations/${organizationId}/memberships/${uid}`;
 }
@@ -90,7 +94,7 @@ describe("Firestore governance rules", () => {
         await setDoc(doc(db,`organizations/${org}/auditEvents/one`),{action:"visit"});
       }
     });
-    const db=environment.authenticatedContext("operations").firestore();
+    const db=normalContext("operations");
     await assertSucceeds(getDocs(collection(db,"organizations/d2-smart-home/memberships")));
     await assertSucceeds(getDocs(collection(db,"organizations/d2-smart-home/auditEvents")));
     await assertFails(getDocs(collection(db,"organizations/d2-hvac-solutions/memberships")));
@@ -106,28 +110,28 @@ describe("Firestore governance rules", () => {
   });
 
   it("allows a user to read their own membership even when suspended", async () => {
-    const activeDatabase = environment.authenticatedContext("representative").firestore();
-    const suspendedDatabase = environment.authenticatedContext("suspended").firestore();
+    const activeDatabase = normalContext("representative");
+    const suspendedDatabase = normalContext("suspended");
     await assertSucceeds(getDoc(doc(activeDatabase, membershipPath("representative"))));
     await assertSucceeds(getDoc(doc(suspendedDatabase, membershipPath("suspended"))));
   });
 
   it("limits the group directory to the super admin", async () => {
-    const ownerDatabase = environment.authenticatedContext("owner").firestore();
-    const operationsDatabase = environment.authenticatedContext("operations").firestore();
+    const ownerDatabase = normalContext("owner");
+    const operationsDatabase = normalContext("operations");
     await assertSucceeds(getDocs(collection(ownerDatabase, `organizations/${organizationId}/memberships`)));
     await assertFails(getDocs(collection(operationsDatabase, `organizations/${organizationId}/memberships`)));
   });
 
   it("rejects membership lists for sales users and suspended administrators", async () => {
-    const representativeDatabase = environment.authenticatedContext("representative").firestore();
-    const suspendedAdminDatabase = environment.authenticatedContext("suspended-admin").firestore();
+    const representativeDatabase = normalContext("representative");
+    const suspendedAdminDatabase = normalContext("suspended-admin");
     await assertFails(getDocs(collection(representativeDatabase, `organizations/${organizationId}/memberships`)));
     await assertFails(getDocs(collection(suspendedAdminDatabase, `organizations/${organizationId}/memberships`)));
   });
 
   it("rejects all direct membership writes including owner writes", async () => {
-    const ownerDatabase = environment.authenticatedContext("owner").firestore();
+    const ownerDatabase = normalContext("owner");
     const reference = doc(ownerDatabase, membershipPath("representative"));
     await assertFails(setDoc(doc(ownerDatabase, membershipPath("new-member")), membership("viewer")));
     await assertFails(updateDoc(reference, { role: "owner" }));
@@ -135,9 +139,9 @@ describe("Firestore governance rules", () => {
   });
 
   it("limits group invitations and audit logs to the active super admin", async () => {
-    const ownerDatabase = environment.authenticatedContext("owner").firestore();
-    const operationsDatabase = environment.authenticatedContext("operations").firestore();
-    const representativeDatabase = environment.authenticatedContext("representative").firestore();
+    const ownerDatabase = normalContext("owner");
+    const operationsDatabase = normalContext("operations");
+    const representativeDatabase = normalContext("representative");
     const invitation = doc(ownerDatabase, `organizations/${organizationId}/invitations/invite-1`);
     const audit = doc(ownerDatabase, `organizations/${organizationId}/auditEvents/audit-1`);
     await assertSucceeds(getDoc(invitation));
@@ -149,14 +153,14 @@ describe("Firestore governance rules", () => {
   });
 
   it("denies unknown and legacy paths by default", async () => {
-    const ownerDatabase = environment.authenticatedContext("owner").firestore();
+    const ownerDatabase = normalContext("owner");
     await assertFails(getDoc(doc(ownerDatabase, "users/legacy-user")));
     await assertFails(getDoc(doc(ownerDatabase, `organizations/${organizationId}/leads/lead-1`)));
   });
 
   it("honors denied permissions and removed admin modules on the server", async () => {
     for (const uid of ["no-admin-module", "denied-admin"]) {
-      const db = environment.authenticatedContext(uid).firestore();
+      const db = normalContext(uid);
       await assertFails(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
       await assertFails(getDocs(collection(db, `organizations/${organizationId}/auditEvents`)));
       await assertSucceeds(getDoc(doc(db, membershipPath(uid))));
@@ -164,13 +168,13 @@ describe("Firestore governance rules", () => {
   });
 
   it("denies cross-organization reads even for an owner", async () => {
-    const db = environment.authenticatedContext("owner").firestore();
+    const db = normalContext("owner");
     await assertFails(getDocs(collection(db, "organizations/another-organization/memberships")));
     await assertFails(getDoc(doc(db, "organizations/another-organization/auditEvents/event")));
   });
 
   it("revokes administrative reads after suspension", async () => {
-    const db = environment.authenticatedContext("owner").firestore();
+    const db = normalContext("owner");
     await assertSucceeds(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
     await environment.withSecurityRulesDisabled(async (context) => updateDoc(doc(context.firestore(), membershipPath("owner")), { status: "suspended" }));
     await assertFails(getDocs(collection(db, `organizations/${organizationId}/memberships`)));
