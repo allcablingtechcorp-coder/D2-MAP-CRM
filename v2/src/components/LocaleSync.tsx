@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRuntimeSession } from "../application/SessionRuntime";
 import { useI18n } from "../i18n/i18n";
 import { useLifecycleText } from "../i18n/lifecycle";
+import { portalEmbedCompany } from "../application/portalHandoff";
 
 export function LocaleSync() {
   const runtime = useRuntimeSession(), { locale, setLocale } = useI18n(), l = useLifecycleText();
   const [ready, setReady] = useState(false), [error, setError] = useState(false);
   const latest = useRef(locale); latest.current = locale;
-  const repository = runtime.mode === "firebase" ? runtime.commercial : null;
+  const repository = runtime.mode === "firebase" && !portalEmbedCompany(window.location.search) ? runtime.commercial : null;
   const uid = runtime.identity?.uid;
   useEffect(() => {
     if (!repository) return;

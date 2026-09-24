@@ -22,6 +22,7 @@ import { activeLeadFilterCount, emptyLeadFilters, filterLeads, type LeadFilters 
 import { useRuntimeSession } from "./application/SessionRuntime";
 import { GoogleProspecting } from "./components/GoogleProspecting";
 import { CompanyDialog, ContactDialog } from "./components/CompanyDialogs";
+import { portalEmbedCompany } from "./application/portalHandoff";
 
 const stageKeys: Record<OpportunityStage, TranslationKey> = { discovery: "stage.discovery", diagnosis: "stage.diagnosis", proposal: "stage.proposal", negotiation: "stage.negotiation", won: "stage.won", lost: "stage.lost" };
 const qualificationKeys: Record<LeadQualification, TranslationKey> = { new: "qualification.new", contacting: "qualification.contacting", qualified: "qualification.qualified", nurturing: "qualification.nurturing", disqualified: "qualification.disqualified" };
@@ -158,6 +159,7 @@ export function App() {
   const runtime = useRuntimeSession();
   const { mode, identity, membership } = runtime;
   const { t } = useI18n();
+  const portalEmbed = Boolean(portalEmbedCompany(window.location.search));
   const availableModules = membership?.modules.filter((moduleId) => canAccessModule(membership, moduleId));
   const resolvedModule = !availableModules || availableModules.includes(activeModule)
     ? activeModule
@@ -169,7 +171,7 @@ export function App() {
     mobileNavigationOpen={mobileNavigationOpen}
     onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}
     availableModules={availableModules}
-    account={mode === "firebase" ? { displayName: identity.displayName, photoUrl: identity.photoUrl, detail: t(`role.${membership.role}` as TranslationKey) } : undefined}
+    account={mode === "firebase" ? { displayName: portalEmbed ? "D2 Group" : identity.displayName, photoUrl: portalEmbed ? undefined : identity.photoUrl, detail: t(`role.${membership.role}` as TranslationKey) } : undefined}
     environmentLabel={mode === "demo" ? t("shell.prototype") : undefined}
     onSignOut={runtime.mode === "firebase" ? runtime.signOut : undefined}
     sessionError={runtime.mode === "firebase" ? runtime.actionError : false}

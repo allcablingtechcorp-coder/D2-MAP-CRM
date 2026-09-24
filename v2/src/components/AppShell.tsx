@@ -18,6 +18,7 @@ import { LanguageFlag } from "./LanguageFlag";
 import {CompanySelector} from "./CompanySelector";
 import { Brand } from "./Brand";
 import { PortalReturnLink } from "./PortalReturnLink";
+import { portalEmbedCompany } from "../application/portalHandoff";
 
 export interface NavigationItem {
   id: ModuleId;
@@ -61,6 +62,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const { locale, setLocale, t } = useI18n();
+  const portalEmbed = Boolean(portalEmbedCompany(window.location.search));
   const navigate = (module: ModuleId) => {
     onNavigate(module);
     if (mobileNavigationOpen) onToggleNavigation();
@@ -108,7 +110,7 @@ export function AppShell({
               <span>{account?.detail ?? t("shell.superAdmin")}</span>
             </div>
           </div>
-          {onSignOut && <button className="nav-item" onClick={() => { void onSignOut(); }}><LogOut size={18} /><span>{t("auth.signOut")}</span></button>}
+          {onSignOut && !portalEmbed && <button className="nav-item" onClick={() => { void onSignOut(); }}><LogOut size={18} /><span>{t("auth.signOut")}</span></button>}
           {sessionError && <p role="alert">{t("auth.operationError")}</p>}
         </div>
       </aside>
@@ -123,14 +125,14 @@ export function AppShell({
           </button>
           <strong className="topbar-title">{t(`nav.${activeModule}` as TranslationKey)}</strong>
           <div className="topbar-actions">
-            <div className="language-switcher" role="group" aria-label={t("language.label")}>
+            {!portalEmbed && <div className="language-switcher" role="group" aria-label={t("language.label")}>
               {(["en", "pt", "es"] as Locale[]).map((language) => (
                 <button key={language} className={locale === language ? "active" : ""} onClick={() => setLocale(language)} aria-pressed={locale === language} title={t(`language.${language}` as TranslationKey)}>
                   <LanguageFlag locale={language} />
                   <span>{language.toUpperCase()}</span>
                 </button>
               ))}
-            </div>
+            </div>}
             {environmentLabel && <span className="environment-badge">{environmentLabel}</span>}
 
           </div>
