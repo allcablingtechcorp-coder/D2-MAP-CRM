@@ -17,6 +17,7 @@ import { useI18n, type Locale, type TranslationKey } from "../i18n/i18n";
 import { LanguageFlag } from "./LanguageFlag";
 import {CompanySelector} from "./CompanySelector";
 import { Brand } from "./Brand";
+import { PortalReturnLink } from "./PortalReturnLink";
 
 export interface NavigationItem {
   id: ModuleId;
@@ -116,6 +117,7 @@ export function AppShell({
 
       <div className="workspace">
         <header className="topbar">
+          <PortalReturnLink />
           <button className="icon-button menu-button" onClick={onToggleNavigation} aria-label={t("shell.openNavigation")}>
             <Menu size={21} />
           </button>

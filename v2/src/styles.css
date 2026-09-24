@@ -28,6 +28,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .maintenance-toolbar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
 .session-page { min-height: 100vh; display: grid; grid-template-rows: 76px 1fr; background: radial-gradient(circle at 75% 18%, rgb(48 105 218 / 16%), transparent 32%), #0c172b; }
 .session-page > header { padding: 0 clamp(20px, 4vw, 58px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgb(255 255 255 / 9%); }
+.session-header-start { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.portal-return { min-height: 42px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #c6d7e0; border-radius: 10px; background: #fff; color: #214b60; font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.portal-return:hover { background: #eef6fa; }
+.portal-return:focus-visible { outline: 3px solid #1c6a93; outline-offset: 2px; }
+.session-page .portal-return { background: #fff; }
 .session-page > header .language-switcher { border-color: rgb(255 255 255 / 12%); background: rgb(255 255 255 / 6%); }
 .session-page > header .language-switcher button { color: #aebbd0; }
 .session-page > header .language-switcher button.active { background: #fff; color: #2159c4; }
@@ -66,6 +71,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 .workspace { min-height: 100vh; margin-left: 252px; }
 .topbar { position: sticky; top: 0; z-index: 10; height: 70px; padding: 0 32px; display: flex; align-items: center; gap: 18px; border-bottom: 1px solid var(--border); background: rgb(255 255 255 / 94%); backdrop-filter: blur(14px); }
+@media (max-width: 600px) { .topbar:has(.portal-return) .topbar-title { display: none; }.topbar:has(.portal-return) { gap: 7px; }.topbar .portal-return { padding-inline: 8px; font-size: 12px; }.session-header-start:has(.portal-return) .brand-lockup { display: none; } }
 .global-search { width: min(470px, 48vw); height: 39px; padding: 0 12px; display: flex; align-items: center; gap: 9px; border: 1px solid #dfe5ec; border-radius: 9px; background: #f8fafc; color: #7a8798; }
 .global-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #1f2937; font-size: 14px; }
 .global-search kbd { padding: 2px 6px; border: 1px solid #d6dde7; border-radius: 5px; background: #fff; color: #79869a; font-size: 14px; }
