@@ -18,6 +18,7 @@ export type SessionState =
 export interface AuthGateway {
   observeIdentity(listener: (identity: AuthIdentity | null) => void): () => void;
   signInWithGoogle(): Promise<AuthIdentity>;
+  signInFromPortal?(portalToken: string, company: "smart" | "hvac"): Promise<void>;
   signOut(): Promise<void>;
   isEmailLink?(): boolean;
   requestEmailLink?(email:string,locale:string):Promise<void>;

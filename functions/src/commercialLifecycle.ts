@@ -1,5 +1,5 @@
 import { requireCommercialNamespace, requireGroupAccess } from "./companyWorkspaces.js";
-import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
+import { crmCallableOptions, consumeRequestBudget, assertPortalLease } from "./requestProtection.js";
 import { FieldPath, FieldValue, Timestamp, getFirestore, type DocumentData, type Transaction, type Query } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { parseMembershipDocument, type MembershipDocument } from "./membershipPolicy.js";
@@ -40,6 +40,7 @@ function readQueries(base: Query, actor: MembershipDocument, uid: string) {
 
 export const loadCommercialPage = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "cursor"]);
@@ -60,6 +61,7 @@ export const loadCommercialPage = onCall(options, async (request) => {
 
 export const changeCommercialRecord = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "recordId", "revision", "action", "patch", "reason", "ownerUid", "teamId"]);
@@ -130,6 +132,7 @@ export const changeCommercialRecord = onCall(options, async (request) => {
 
 export const listAssignmentOptions = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "cursor"]);
@@ -151,6 +154,7 @@ export const listAssignmentOptions = onCall(options, async (request) => {
 
 export const commercialRecordHistory = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   const input = object(request.data); exact(input, ["organizationId", "collection", "recordId", "cursor"]);
@@ -167,6 +171,7 @@ export const commercialRecordHistory = onCall(options, async (request) => {
 
 export const userPreferences = onCall(options, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   console.info(JSON.stringify({ event: "crm_app_check", verified: !!request.app }));
   const input = object(request.data); exact(input, ["organizationId", "locale"]);

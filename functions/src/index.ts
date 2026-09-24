@@ -1,10 +1,11 @@
 import { requireCommercialNamespace, requireGroupAccess, companyIds, GROUP_ID } from "./companyWorkspaces.js";
+export { portalCrmExchange } from "./portalBridge.js";
 import { deliverInvitation } from "./invitationLifecycle.js";
 import {emailCallableOptions} from "./emailDelivery.js";
 export { manageInvitation, requestEmailAccess } from "./invitationLifecycle.js";
 import { object, exact, id as inputId } from "./lifecyclePolicy.js";
 import { FieldPath } from "firebase-admin/firestore";
-import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
+import { crmCallableOptions, consumeRequestBudget, assertPortalLease } from "./requestProtection.js";
 import { dateIso, serializeLead, serializeCompany, serializeContact, serializeActivity, serializeOpportunity } from "./commercialSerialization.js";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, Timestamp, getFirestore, type DocumentData, type Query, type Transaction } from "firebase-admin/firestore";
@@ -42,6 +43,7 @@ const callableOptions = crmCallableOptions;
 
 export const saveMembership = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   const authenticatedUser = request.auth;
 
@@ -194,6 +196,7 @@ async function scopedDocuments(organizationId: string, collectionName: string, a
 
 export const loadCommercialWorkspace = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -218,6 +221,7 @@ export const loadCommercialWorkspace = onCall(callableOptions, async (request) =
 
 export const createCommercialLead = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -267,6 +271,7 @@ function invitationLock(organizationId: string, email: string) {
 
 export const listGovernanceDirectory = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { const data = object(request.data); exact(data, ["organizationId", "collection", "cursor"]); if (data.collection !== undefined && !["invitations", "teams"].includes(String(data.collection))) throw new HttpsError("invalid-argument", "Invalid collection"); input = { organizationId: inputId(data.organizationId), collection: data.collection, cursor: data.cursor ? inputId(data.cursor) : "" }; }
@@ -291,6 +296,7 @@ export const listGovernanceDirectory = onCall(callableOptions, async (request) =
 
 export const createGovernanceTeam = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateTeamCommand(request.data); }
@@ -312,6 +318,7 @@ export const createGovernanceTeam = onCall(callableOptions, async (request) => {
 
 export const createGovernanceInvitation = onCall(emailCallableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseCreateInvitationCommand(request.data); if (["d2-smart-home","d2-hvac-solutions"].includes(input.organizationId)) throw new HttpsError("failed-precondition","Issue company invitations through D2 Group"); }
@@ -348,6 +355,7 @@ export const createGovernanceInvitation = onCall(emailCallableOptions, async (re
 
 export const acceptGovernanceInvitation = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseOrganizationCommand(request.data); }
@@ -391,6 +399,7 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
 
 export const recordSessionEvent = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId, true);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseSessionCommand(request.data); }
@@ -415,6 +424,7 @@ export const recordSessionEvent = onCall(callableOptions, async (request) => {
 
 export const createCommercialCompany = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -440,6 +450,7 @@ export const createCommercialCompany = onCall(callableOptions, async (request) =
 
 export const createCommercialContact = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -480,6 +491,7 @@ async function linkedCompany(transaction: Transaction, organizationId: string, u
 
 export const createCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -503,6 +515,7 @@ export const createCommercialActivity = onCall(callableOptions, async (request) 
 
 export const createCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -526,6 +539,7 @@ export const createCommercialOpportunity = onCall(callableOptions, async (reques
 
 export const transitionCommercialOpportunity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
@@ -556,6 +570,7 @@ export const transitionCommercialOpportunity = onCall(callableOptions, async (re
 
 export const completeCommercialActivity = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;

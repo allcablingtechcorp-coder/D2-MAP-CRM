@@ -6,10 +6,12 @@ import {
   GoogleAuthProvider,
   isSignInWithEmailLink, signInWithEmailLink,
   browserLocalPersistence,
+  inMemoryPersistence,
   getAuth,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
+  signInWithCustomToken,
   signOut as firebaseSignOut,
   type Auth,
   type User,
@@ -63,6 +65,13 @@ export class FirebaseAuthGateway implements AuthGateway {
     provider.setCustomParameters({ prompt: "select_account" });
     const result = await signInWithPopup(this.auth, provider);
     return identityFromFirebaseUser(result.user);
+  }
+
+  async signInFromPortal(portalToken: string, company: "smart" | "hvac"): Promise<void> {
+    const exchange = httpsCallable<{ portalToken: string; company: "smart" | "hvac" }, { token: string }>(this.functions, "portalCrmExchange");
+    const result = await exchange({ portalToken, company });
+    await setPersistence(this.auth, inMemoryPersistence);
+    await signInWithCustomToken(this.auth, result.data.token);
   }
 
   signOut(): Promise<void> {

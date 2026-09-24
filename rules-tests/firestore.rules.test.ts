@@ -62,6 +62,25 @@ afterAll(async () => {
 });
 
 describe("Firestore governance rules", () => {
+  it("limits a Portal custom-token session to its company and expiration", async () => {
+    await environment.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await updateDoc(doc(db, membershipPath("owner")), { companyIds: ["d2-smart-home", "d2-hvac-solutions"] });
+      for (const org of ["d2-smart-home", "d2-hvac-solutions"])
+        await setDoc(doc(db, `organizations/${org}/memberships/owner`), membership("owner"));
+    });
+    const claims = { firebase: { sign_in_provider: "custom" }, portal_bridge: true,
+      portal_company: "smart", portal_until: Math.floor(Date.now() / 1000) + 900 };
+    const db = environment.authenticatedContext("owner", claims).firestore();
+    await assertSucceeds(getDoc(doc(db, membershipPath("owner"))));
+    await assertSucceeds(getDoc(doc(db, "organizations/d2-smart-home/memberships/owner")));
+    await assertFails(getDoc(doc(db, "organizations/d2-hvac-solutions/memberships/owner")));
+    await assertFails(getDocs(collection(db, "organizations/d2-group/auditEvents")));
+    const expired = environment.authenticatedContext("owner", { ...claims, portal_until: 1 }).firestore();
+    await assertFails(getDoc(doc(expired, "organizations/d2-smart-home/memberships/owner")));
+    const refreshedWithoutClaims = environment.authenticatedContext("owner", { firebase: { sign_in_provider: "custom" } }).firestore();
+    await assertFails(getDoc(doc(refreshedWithoutClaims, "organizations/d2-smart-home/memberships/owner")));
+  });
   it("isolates company directories and rejects stale grants or cross-company self reads",async()=>{
     await environment.withSecurityRulesDisabled(async context=>{
       const db=context.firestore();

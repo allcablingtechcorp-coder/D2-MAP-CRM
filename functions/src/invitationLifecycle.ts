@@ -5,7 +5,7 @@ import { GROUP_ID, companyIds } from "./companyWorkspaces.js";
 import { canManageMemberships, parseMembershipDocument } from "./membershipPolicy.js";
 import { parseCreateInvitationCommand } from "./governancePolicy.js";
 import { exact, id, object } from "./lifecyclePolicy.js";
-import { consumeRequestBudget } from "./requestProtection.js";
+import { consumeRequestBudget, assertPortalLease } from "./requestProtection.js";
 import { sendAccessEmail, emailCallableOptions } from "./emailDelivery.js";
 
 const root = () => getFirestore().doc(`organizations/${GROUP_ID}`);
@@ -38,6 +38,7 @@ export async function deliverInvitation(invitationId:string, uid:string) {
 
 export const manageInvitation=onCall(emailCallableOptions,async request=>{
   if(!request.auth)throw new HttpsError("unauthenticated","Sign in required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   const uid=request.auth.uid;await consumeRequestBudget(uid);
   const input=object(request.data);exact(input,["action","invitationId","patch"]);
   const invitationId=id(input.invitationId), action=input.action;

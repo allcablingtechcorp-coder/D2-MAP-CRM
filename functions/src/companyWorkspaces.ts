@@ -1,6 +1,6 @@
 import { getFirestore, FieldValue, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
+import { crmCallableOptions, consumeRequestBudget, assertPortalLease } from "./requestProtection.js";
 import { exact, id, object } from "./lifecyclePolicy.js";
 import { canManageMemberships, isProtectedOwner, parseMembershipDocument } from "./membershipPolicy.js";
 
@@ -24,6 +24,7 @@ export async function requireGroupAccess(org: string, uid: string, tx?: Transact
 // Only the group super admin can grant/revoke company access. Company roles remain independent.
 export const companyAccess = onCall(crmCallableOptions, async request => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required");
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
   const uid = request.auth.uid; await consumeRequestBudget(uid);
   const input = object(request.data); exact(input,["action","targetUid","companyIds","reason"]);
   const db = getFirestore(), root = db.doc(`organizations/${GROUP_ID}`);
