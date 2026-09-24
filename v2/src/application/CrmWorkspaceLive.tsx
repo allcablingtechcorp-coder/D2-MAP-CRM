@@ -6,6 +6,7 @@ import type { Activity, Company, Contact, Lead, Opportunity, OpportunityStage } 
 import { useRuntimeSession } from "./SessionRuntime";
 import { workspaceStorageKey } from "./workspaceStorage";
 import { useI18n } from "../i18n/i18n";
+import { PORTAL_ORIGIN, portalEmbedCompany } from "./portalHandoff";
 import { canPerformCommercialAction, type Membership, type Permission } from "../domain/access";
 import { completeActivity as completeLocalActivity, createLead as createLocalLead, transitionOpportunity, type LeadCreationResult, type LeadInput, type OpportunityTransitionResult } from "../domain/workflows";
 import type { CommercialRepository, CommercialWorkspaceSnapshot } from "./commercial";
@@ -149,6 +150,13 @@ function FirebaseWorkspace({ children, repository, membership }: { children: Rea
   const [loadFailure, setLoadFailure] = useState<"capacity" | "network" | null>(null);
   const [reload, setReload] = useState(0);
   const allowed = (permission: Permission) => canPerformCommercialAction(membership, permission);
+
+  useEffect(() => {
+    const company = portalEmbedCompany(window.location.search);
+    if (!loading && company && window.parent !== window) {
+      window.parent.postMessage({ type: "d2-crm-ready", company }, PORTAL_ORIGIN);
+    }
+  }, [loading]);
 
   useEffect(() => {
     let active = true;
