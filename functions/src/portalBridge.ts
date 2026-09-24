@@ -10,6 +10,7 @@ const PORTAL_PROJECT = "d2-group-system";
 const PORTAL_SESSION_URL = "https://d2-group-system.web.app/api/workspace";
 const PORTAL_OWNER_EMAIL = "dante.frota@allcablingtech.com";
 const CRM_OWNER_EMAIL = "allcablingtechcorp@gmail.com";
+const CRM_RUNTIME_SERVICE_ACCOUNT = "d2-crm-runtime@d2-map-crm.iam.gserviceaccount.com";
 const organizationByCompany = { smart: "d2-smart-home", hvac: "d2-hvac-solutions" } as const;
 type Company = keyof typeof organizationByCompany;
 
@@ -25,6 +26,11 @@ export function portalCrmGrant(session: unknown, uid: string, email: string, com
 
 function verifier() {
   const app = (() => { try { return getApp("d2-portal-verifier"); } catch { return initializeApp({ projectId: PORTAL_PROJECT }, "d2-portal-verifier"); } })();
+  return getAuth(app);
+}
+
+function tokenSigner() {
+  const app = (() => { try { return getApp("d2-crm-token-signer"); } catch { return initializeApp({ projectId: "d2-map-crm", serviceAccountId: CRM_RUNTIME_SERVICE_ACCOUNT }, "d2-crm-token-signer"); } })();
   return getAuth(app);
 }
 
@@ -66,6 +72,6 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
     || companyAccess.role !== "owner" || companyAccess.status !== "active" || companyAccess.email !== CRM_OWNER_EMAIL)
     throw new HttpsError("permission-denied", "CRM owner membership is unavailable");
   const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
-  const token = await auth.createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt });
+  const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt });
   return { token, expiresAt };
 });

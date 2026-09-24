@@ -6,6 +6,7 @@ const labels = { en: "Back to Portal", pt: "Voltar ao Portal", es: "Volver al Po
 
 export function PortalReturnLink() {
   const { locale } = useI18n();
-  if (new URLSearchParams(window.location.search).get("source") !== "d2-portal") return null;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("source") !== "d2-portal" || params.get("embed") === "1") return null;
   return <a className="portal-return" href={portalUrl} target="_top"><ArrowLeft size={18} aria-hidden="true" />{labels[locale]}</a>;
 }
