@@ -14,7 +14,9 @@ export function LocaleSync() {
     let active = true; setReady(false); const initial = latest.current;
     repository.preferences().then((stored) => {
       if (!active) return;
-      if (latest.current === initial && (stored.locale === "en" || stored.locale === "pt" || stored.locale === "es")) setLocale(stored.locale);
+      const requested = new URLSearchParams(window.location.search).get("lang");
+      const preferred = requested === "en" || requested === "pt" || requested === "es" ? requested : stored.locale;
+      if (latest.current === initial && (preferred === "en" || preferred === "pt" || preferred === "es")) setLocale(preferred);
       setReady(true); setError(false);
     }).catch(() => { if(active) { setError(true); setReady(true); } });
     return () => { active = false; };

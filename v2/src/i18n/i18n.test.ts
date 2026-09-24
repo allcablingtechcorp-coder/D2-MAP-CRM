@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { catalogs, translate, type Locale } from "./translations";
-import { resolveStoredLocale } from "./i18n";
+import { preferredLocale, resolveStoredLocale } from "./i18n";
 
 describe("internationalization catalogs", () => {
   const locales: Locale[] = ["pt", "en", "es"];
@@ -22,5 +22,10 @@ describe("internationalization catalogs", () => {
     expect(resolveStoredLocale("invalid")).toBe("en");
     expect(resolveStoredLocale("pt")).toBe("pt");
     expect(resolveStoredLocale("es")).toBe("es");
+  });
+
+  it("opens in the Portal language while rejecting unknown link values", () => {
+    expect(preferredLocale("?lang=es", "pt")).toBe("es");
+    expect(preferredLocale("?lang=unknown", "pt")).toBe("pt");
   });
 });

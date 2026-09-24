@@ -19,11 +19,25 @@ export function resolveStoredLocale(stored: string | null): Locale {
   return stored === "en" || stored === "es" || stored === "pt" ? stored : "en";
 }
 
+export function preferredLocale(search: string, stored: string | null): Locale {
+  const requested = new URLSearchParams(search).get("lang");
+  return requested === "en" || requested === "es" || requested === "pt" ? requested : resolveStoredLocale(stored);
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    try { return resolveStoredLocale(localStorage.getItem(LOCALE_STORAGE_KEY)); }
-    catch { return "en"; }
+    try { return preferredLocale(window.location.search,localStorage.getItem(LOCALE_STORAGE_KEY)); }
+    catch { return preferredLocale(window.location.search,null); }
   });
+
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("lang")) {
+      url.searchParams.set("lang",next);
+      window.history.replaceState(window.history.state,"",url);
+    }
+  };
 
   useEffect(() => {
     try { localStorage.setItem(LOCALE_STORAGE_KEY, locale); }
@@ -33,7 +47,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<I18nValue>(() => ({
     locale,
-    setLocale: setLocaleState,
+    setLocale,
     t: (key, variables) => translate(locale, key, variables),
     formatDateTime: (value) => new Intl.DateTimeFormat(localeCode[locale], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)),
     formatShortDate: (value) => new Intl.DateTimeFormat(localeCode[locale], { day: "2-digit", month: "short" }).format(new Date(value)),
