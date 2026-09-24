@@ -13,7 +13,7 @@ import { type AuthGateway, type AuthIdentity, type MembershipRepository, type Se
 import { observeSession } from "./observeSession";
 import { LanguageFlag } from "../components/LanguageFlag";
 import { PortalReturnLink } from "../components/PortalReturnLink";
-import { portalEmbedCompany, requestPortalToken } from "./portalHandoff";
+import { PORTAL_ORIGIN, portalEmbedCompany, requestPortalToken } from "./portalHandoff";
 import type { CommercialRepository } from "./commercial";
 
 type RuntimeSession =
@@ -154,6 +154,12 @@ function CompanyBoundary({group,forCompany,companyAccess,children}:{group:Fireba
 function CompanySession({group,scope,organizationId,children}:{group:FirebaseSession;scope:CompanyScopeRepositories;organizationId:string;children:ReactNode}) {
   const l=useBusinessText(),{t}=useI18n(); const [membership,setMembership]=useState<Membership|null>(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
   useEffect(()=>{setFailed(false);setMembership(null);return scope.memberships.observeByUid(group.identity.uid,member=>{setMembership(member);setFailed(!member||member.status!=="active");},()=>setFailed(true));},[scope,group.identity.uid,attempt]);
+  useEffect(()=>{
+    const company=portalEmbedCompany(window.location.search);
+    if(membership?.status==="active" && company && window.parent!==window){
+      window.parent.postMessage({type:"d2-crm-ready",company},PORTAL_ORIGIN);
+    }
+  },[membership?.status]);
   if(failed)return <><CompanySelector/><div className="session-page"><section className="session-card"><Brand/><p>{l.none}</p><button className="action-button" onClick={()=>setAttempt(a=>a+1)}>{l.reload}</button><button className="action-button secondary" onClick={group.signOut}>{t("auth.signOut")}</button></section></div></>;
   if(!membership)return <div className="workflow-feedback" role="status">{l.loading}</div>;
   return <RuntimeSessionContext.Provider value={{...group,...scope,membership,organizationId}}>{children}</RuntimeSessionContext.Provider>;
