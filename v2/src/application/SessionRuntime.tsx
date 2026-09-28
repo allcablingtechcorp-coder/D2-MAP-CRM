@@ -81,7 +81,10 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
         await auth.signInFromPortal!(token, company);
         if (active) setBridgeState("ready");
       } catch {
-        if (active) setBridgeState("failed");
+        if (active) {
+          setBridgeState("failed");
+          await auth.signOut().catch(() => undefined);
+        }
       }
     };
     void connect();
