@@ -4,22 +4,37 @@ import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
 import { GROUP_ID } from "./companyWorkspaces.js";
-import { isProtectedOwner, parseMembershipDocument } from "./membershipPolicy.js";
+import { isProtectedOwner, parseMembershipDocument, type MembershipDocument } from "./membershipPolicy.js";
 
 const PORTAL_PROJECT = "d2-group-system";
 const PORTAL_SESSION_URL = "https://d2-group-system.web.app/api/workspace";
 const PORTAL_OWNER_EMAIL = "dante.frota@allcablingtech.com";
 const CRM_OWNER_EMAIL = "allcablingtechcorp@gmail.com";
+const LEONARDO_PORTAL_EMAIL = "leonardo.dantas@allcablingtech.com";
+const LEONARDO_CRM_EMAIL = "leonardoagiani@gmail.com";
 const CRM_RUNTIME_SERVICE_ACCOUNT = "d2-crm-runtime@d2-map-crm.iam.gserviceaccount.com";
 const organizationByCompany = { smart: "d2-smart-home", hvac: "d2-hvac-solutions" } as const;
 type Company = keyof typeof organizationByCompany;
 
+export function leonardoCrmMembershipReady(group: MembershipDocument, company: MembershipDocument, companyIds: unknown): boolean {
+  const requiredModules = ["dashboard", "leads", "pipeline", "activities", "prospecting", "companies", "reports"] as const;
+  return Array.isArray(companyIds) && companyIds.includes("d2-smart-home") && !companyIds.includes("d2-hvac-solutions")
+    && group.email === LEONARDO_CRM_EMAIL && company.email === LEONARDO_CRM_EMAIL
+    && group.status === "active" && company.status === "active"
+    && group.role === "sales_manager" && company.role === "sales_manager"
+    && company.scope === "organization" && !isProtectedOwner(group) && !isProtectedOwner(company)
+    && requiredModules.every(module => company.modules.includes(module));
+}
+
 export function portalCrmGrant(session: unknown, uid: string, email: string, company: Company): boolean {
   if (!session || typeof session !== "object") return false;
   const state = session as Record<string, unknown>;
-  const grants = state.grants as Record<string, { status?: string; modules?: { crm?: { scope?: string; actions?: string[] } } }> | undefined;
-  return state.uid === uid && state.email === email && state.superAdmin === true
-    && email === PORTAL_OWNER_EMAIL && Array.isArray(state.companies) && state.companies.includes(company)
+  const grants = state.grants as Record<string, { status?: string; role?: string; modules?: { crm?: { scope?: string; actions?: string[] } } }> | undefined;
+  const owner = state.superAdmin === true && email === PORTAL_OWNER_EMAIL;
+  const leonardo = email === LEONARDO_PORTAL_EMAIL && company === "smart" && state.emailVerified === true
+    && grants?.smart?.role === "manager" && ["read", "create", "edit", "assign"].every(action => grants?.smart?.modules?.crm?.actions?.includes(action));
+  return state.uid === uid && state.email === email && (owner || leonardo)
+    && Array.isArray(state.companies) && state.companies.includes(company)
     && grants?.[company]?.status === "active" && grants[company].modules?.crm?.scope === "company"
     && grants[company].modules?.crm?.actions?.includes("read") === true;
 }
@@ -44,7 +59,6 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
   try { decoded = await verifier().verifyIdToken(input.portalToken); }
   catch { throw new HttpsError("unauthenticated", "Portal session is invalid"); }
   const email = typeof decoded.email === "string" ? decoded.email.trim().toLowerCase() : "";
-  if (email !== PORTAL_OWNER_EMAIL) throw new HttpsError("permission-denied", "Portal owner access required");
   await consumeRequestBudget(`portal:${decoded.uid}`);
   let session: unknown;
   try {
@@ -57,21 +71,35 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
     } finally { clearTimeout(timer); }
   } catch { throw new HttpsError("unavailable", "Portal session could not be verified"); }
   if (!portalCrmGrant(session, decoded.uid, email, company)) throw new HttpsError("permission-denied", "CRM access is not authorized in the Portal");
-  const auth = getAuth();
-  const user = await auth.getUserByEmail(CRM_OWNER_EMAIL);
-  if (user.disabled) throw new HttpsError("permission-denied", "CRM owner account is disabled");
   const db = getFirestore(), org = organizationByCompany[company];
+  const auth = getAuth(), owner = email === PORTAL_OWNER_EMAIL;
+  let user;
+  if (owner) user = await auth.getUserByEmail(CRM_OWNER_EMAIL);
+  else {
+    const link = (await db.doc(`portalIdentityLinks/${decoded.uid}`).get()).data();
+    if (!link || company !== "smart" || link.portalEmail !== LEONARDO_PORTAL_EMAIL
+      || link.crmEmail !== LEONARDO_CRM_EMAIL || link.companyId !== org || typeof link.crmUid !== "string")
+      throw new HttpsError("permission-denied", "CRM identity link is unavailable");
+    user = await auth.getUser(link.crmUid);
+    if (user.email?.trim().toLowerCase() !== LEONARDO_CRM_EMAIL) throw new HttpsError("permission-denied", "CRM identity link changed");
+  }
+  if (user.disabled) throw new HttpsError("permission-denied", "CRM account is disabled");
   const [group, member] = await Promise.all([
     db.doc(`organizations/${GROUP_ID}/memberships/${user.uid}`).get(),
     db.doc(`organizations/${org}/memberships/${user.uid}`).get(),
   ]);
   if (!group.exists || !member.exists) throw new HttpsError("permission-denied", "CRM membership is unavailable");
   const groupAccess = parseMembershipDocument(group.data()), companyAccess = parseMembershipDocument(member.data());
-  if (!isProtectedOwner(groupAccess) || groupAccess.role !== "owner" || groupAccess.status !== "active"
-    || !Array.isArray(group.data()?.companyIds) || !group.data()!.companyIds.includes(org)
-    || companyAccess.role !== "owner" || companyAccess.status !== "active" || companyAccess.email !== CRM_OWNER_EMAIL)
-    throw new HttpsError("permission-denied", "CRM owner membership is unavailable");
-  const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
+  if (!Array.isArray(group.data()?.companyIds) || !group.data()!.companyIds.includes(org)
+    || groupAccess.status !== "active" || companyAccess.status !== "active")
+    throw new HttpsError("permission-denied", "CRM membership is unavailable");
+  if (owner) {
+    if (!isProtectedOwner(groupAccess) || groupAccess.role !== "owner" || companyAccess.role !== "owner" || companyAccess.email !== CRM_OWNER_EMAIL)
+      throw new HttpsError("permission-denied", "CRM owner membership is unavailable");
+  } else if (!leonardoCrmMembershipReady(groupAccess, companyAccess, group.data()?.companyIds)) {
+    throw new HttpsError("permission-denied", "CRM manager membership is unavailable");
+  }
+  const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
   const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt });
   return { token, expiresAt };
 });

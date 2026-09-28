@@ -85,7 +85,7 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
       }
     };
     void connect();
-    const interval = window.setInterval(() => { if (active) void connect(); }, 10 * 60 * 1000);
+    const interval = window.setInterval(() => { if (active) void connect(); }, 4 * 60 * 1000);
     return () => { active = false; window.clearInterval(interval); };
   }, [auth]);
 
