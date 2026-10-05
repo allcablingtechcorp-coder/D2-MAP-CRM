@@ -12,6 +12,16 @@ const session = {
 };
 
 describe("Portal CRM owner handoff", () => {
+  it("allows consolidated reads but rejects business mutations even in the base company", () => {
+    const token={firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300,portal_report_all:true};
+    for(const org of ["d2-smart-home","d2-hvac-solutions"]){
+      expect(()=>assertPortalLease(token,org,false,true)).not.toThrow();
+      expect(()=>assertPortalLease(token,org)).toThrow();
+    }
+    expect(()=>assertPortalLease(token,"d2-group",true,true)).not.toThrow();
+    expect(()=>assertPortalLease(token,"other",true,true)).toThrow();
+    expect(()=>assertPortalLease({...token,portal_until:1},"d2-hvac-solutions",false,true)).toThrow();
+  });
   it("requires the exact live owner session and selected company grant", () => {
     expect(portalCrmGrant(session, "portal-owner", owner, "smart")).toBe(true);
     expect(portalCrmGrant(session, "portal-owner", owner, "hvac")).toBe(true);

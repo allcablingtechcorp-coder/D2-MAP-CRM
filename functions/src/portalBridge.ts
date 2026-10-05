@@ -50,8 +50,9 @@ function tokenSigner() {
 }
 
 export const portalCrmExchange = onCall(crmCallableOptions, async request => {
-  const input = request.data as { portalToken?: unknown; company?: unknown } | null;
-  if (!input || Object.keys(input).some(key => !["portalToken", "company"].includes(key))
+  const input = request.data as { portalToken?: unknown; company?: unknown; scope?:unknown } | null;
+  if (!input || Object.keys(input).some(key => !["portalToken", "company", "scope"].includes(key))
+    || (input.scope!==undefined&&input.scope!=="all")
     || typeof input.portalToken !== "string" || input.portalToken.length < 100 || input.portalToken.length > 8000
     || (input.company !== "smart" && input.company !== "hvac")) throw new HttpsError("invalid-argument", "Invalid Portal handoff");
   const company = input.company as Company;
@@ -71,6 +72,7 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
     } finally { clearTimeout(timer); }
   } catch { throw new HttpsError("unavailable", "Portal session could not be verified"); }
   if (!portalCrmGrant(session, decoded.uid, email, company)) throw new HttpsError("permission-denied", "CRM access is not authorized in the Portal");
+  if(input.scope==="all"&&!["smart","hvac"].every(value=>portalCrmGrant(session,decoded.uid,email,value as Company)))throw new HttpsError("permission-denied","Combined reports require both company grants");
   const db = getFirestore(), org = organizationByCompany[company];
   const auth = getAuth(), owner = email === PORTAL_OWNER_EMAIL;
   let user;
@@ -99,7 +101,15 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
   } else if (!leonardoCrmMembershipReady(groupAccess, companyAccess, group.data()?.companyIds)) {
     throw new HttpsError("permission-denied", "CRM manager membership is unavailable");
   }
+  if(input.scope==="all"){
+    if(!owner||groupAccess.ownerProtected!==true||groupAccess.role!=="owner")throw new HttpsError("permission-denied","Combined reports require the protected owner");
+    for(const companyId of Object.values(organizationByCompany)){
+      const record=await db.doc(`organizations/${companyId}/memberships/${user.uid}`).get();
+      const membership=record.exists?parseMembershipDocument(record.data()):null;
+      if(!membership||membership.status!=="active"||membership.role!=="owner"||!group.data()?.companyIds?.includes(companyId))throw new HttpsError("permission-denied","Combined report membership is unavailable");
+    }
+  }
   const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
-  const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt });
+  const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt, ...(input.scope==="all"?{portal_report_all:true}:{}) });
   return { token, expiresAt };
 });

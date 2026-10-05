@@ -25,6 +25,21 @@ describe.skipIf(!enabled)("company isolation in the Firestore emulator",()=>{
   for(const call of [()=>api.loadCommercialPage.run(q("smart-admin",hvac,{collection:"companies"})),()=>api.createCommercialCompany.run(q("smart-admin",hvac,{name:"Attempt",location:"FL",industry:"",website:"",phone:""})),()=>api.commercialRecordHistory.run(q("smart-admin",hvac,{collection:"companies",recordId:"same"})),()=>api.listAssignmentOptions.run(q("smart-admin",hvac))])await expect(call()).rejects.toMatchObject({code:"permission-denied"});
   expect((await api.loadCommercialPage.run(q("both-rep",hvac,{collection:"companies"}))).records[0]?.name).toBe(hvac);
  });
+ it("consolidated Portal reports require a live protected owner and cannot write either company",async()=>{
+  const token={firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300,portal_report_all:true};
+  await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:true});
+  for(const org of [smart,hvac]){
+   await ref(org).collection("companies").doc("same").set({name:org,ownerUid:"company-owner",teamId:null});
+   const result=await api.loadCommercialWorkspace.run(q("company-owner",org,{},token));
+   expect(result.companies[0]?.name).toBe(org);
+   await expect(api.createCommercialCompany.run(q("company-owner",org,{name:"Attempt",location:"FL",industry:"",website:"",phone:""},token))).rejects.toMatchObject({code:"permission-denied"});
+  }
+  await expect(api.loadCommercialWorkspace.run(q("both-rep",hvac,{},token))).rejects.toMatchObject({code:"permission-denied"});
+  await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:false});
+  await expect(api.loadCommercialWorkspace.run(q("company-owner",hvac,{},token))).rejects.toMatchObject({code:"permission-denied"});
+  await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:true,companyIds:[smart]});
+  await expect(api.loadCommercialWorkspace.run(q("company-owner",hvac,{},token))).rejects.toMatchObject({code:"permission-denied"});
+ });
  it("does not trust a stale company membership after the group grant is removed",async()=>{
   await ref(hvac).collection("memberships").doc("smart-admin").set(member("smart-admin","operations_admin"));
   await expect(api.loadCommercialPage.run(q("smart-admin",hvac,{collection:"leads"}))).rejects.toMatchObject({code:"permission-denied"});

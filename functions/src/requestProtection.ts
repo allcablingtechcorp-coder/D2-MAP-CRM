@@ -6,7 +6,7 @@ export const crmCallableOptions = { region: "us-central1", memory: "256MiB" as c
 
 // A custom-token session must never inherit the CRM owner's unrestricted access.
 // Firebase may refresh an ID token, so missing bridge claims also fail closed.
-export function assertPortalLease(token: Record<string, unknown>, organizationId: unknown, allowGroup = false) {
+export function assertPortalLease(token: Record<string, unknown>, organizationId: unknown, allowGroup = false, reportRead = false) {
   const firebase = token.firebase as { sign_in_provider?: unknown } | undefined;
   const custom = firebase?.sign_in_provider === "custom";
   if (!custom && token.portal_bridge !== true) return;
@@ -16,6 +16,10 @@ export function assertPortalLease(token: Record<string, unknown>, organizationId
     || typeof until !== "number" || !Number.isSafeInteger(until) || until <= Math.floor(Date.now() / 1000))
     throw new HttpsError("permission-denied", "Portal CRM session expired");
   const allowed = company === "smart" ? "d2-smart-home" : "d2-hvac-solutions";
+  if(token.portal_report_all===true){
+    if(!reportRead||(!["d2-smart-home","d2-hvac-solutions"].includes(String(organizationId))&&!(allowGroup&&organizationId==="d2-group")))throw new HttpsError("permission-denied","Combined report sessions are read-only");
+    return;
+  }
   if (organizationId !== allowed && !(allowGroup && organizationId === "d2-group"))
     throw new HttpsError("permission-denied", "Company is outside this Portal session");
 }

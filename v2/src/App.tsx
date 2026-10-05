@@ -154,13 +154,14 @@ function Companies() {
 
 const pages: Record<ModuleId, () => React.ReactNode> = { dashboard: Dashboard, leads: Leads, pipeline: Pipeline, activities: Activities, prospecting: Prospecting, companies: Companies, reports: Reports, admin: AdminGovernance };
 export function App() {
-  const [activeModule, setActiveModule] = useState<ModuleId>("dashboard");
+  const [activeModule, setActiveModule] = useState<ModuleId>(()=>new URLSearchParams(location.search).get("view")==="reports"?"reports":"dashboard");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const runtime = useRuntimeSession();
   const { mode, identity, membership } = runtime;
   const { t } = useI18n();
   const portalEmbed = Boolean(portalEmbedCompany(window.location.search));
-  const availableModules = membership?.modules.filter((moduleId) => canAccessModule(membership, moduleId));
+  const reportAll=portalEmbed&&new URLSearchParams(location.search).get("scope")==="all";
+  const availableModules = membership?.modules.filter((moduleId) => (!reportAll||moduleId==="reports")&&canAccessModule(membership, moduleId));
   const resolvedModule = !availableModules || availableModules.includes(activeModule)
     ? activeModule
     : availableModules[0];

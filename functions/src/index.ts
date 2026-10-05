@@ -196,13 +196,14 @@ async function scopedDocuments(organizationId: string, collectionName: string, a
 
 export const loadCommercialWorkspace = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
-  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId);
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId,false,true);
   await consumeRequestBudget(request.auth.uid);
   requireCommercialNamespace(String(request.data?.organizationId));
   let input;
   try { input = parseOrganizationInput(request.data); }
   catch (error) { if (error instanceof InputValidationError) throw new HttpsError("invalid-argument", error.message); throw error; }
   const actor = await commercialActor(input.organizationId, request.auth.uid);
+  if(request.auth.token.portal_report_all===true){const group=await commercialActor(GROUP_ID,request.auth.uid);if(group.status!=="active"||group.role!=="owner"||group.ownerProtected!==true||actor.role!=="owner"||actor.status!=="active")throw new HttpsError("permission-denied","Combined reports require the protected owner");}
   const [leads, opportunities, activities, companies, contacts] = await Promise.all([
     canUseCommercialPermission(actor, "lead.read") ? scopedDocuments(input.organizationId, "leads", actor, request.auth.uid) : [],
     canUseCommercialPermission(actor, "opportunity.read") ? scopedDocuments(input.organizationId, "opportunities", actor, request.auth.uid) : [],
@@ -399,7 +400,7 @@ export const acceptGovernanceInvitation = onCall(callableOptions, async (request
 
 export const recordSessionEvent = onCall(callableOptions, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Authentication is required");
-  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId, true);
+  assertPortalLease(request.auth.token, (request.data as { organizationId?: unknown } | null)?.organizationId, true, true);
   await consumeRequestBudget(request.auth.uid);
   let input;
   try { input = parseSessionCommand(request.data); }
