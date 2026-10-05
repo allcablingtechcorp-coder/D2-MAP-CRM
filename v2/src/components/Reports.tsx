@@ -16,7 +16,7 @@ import { MetricCard, PageHeader } from "./AppShell";
 export function Reports() {
   const { t, locale, formatMoney, formatDateTime } = useI18n();
   const workspace=useCrmWorkspace(),company=useCompany(),l=useBusinessText();
-  const [selectedIds,setSelectedIds]=useState<BusinessId[]>([company.active.id]);
+  const [selectedIds,setSelectedIds]=useState<BusinessId[]>(()=>new URLSearchParams(location.search).get("scope")==="all"?company.available.map(b=>b.id):[company.active.id]);
   const [permitted,setPermitted]=useState<BusinessId[]>([company.active.id]);
   const [reportState,setReportState]=useState<{key:string;reports:CompanyReport[];exportAllowed:boolean;error:boolean}>({key:"",reports:[],exportAllowed:false,error:false});
   const [reload,setReload]=useState(0);

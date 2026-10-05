@@ -78,7 +78,7 @@ function FirebaseSessionBoundary({ auth, memberships, commercial, forCompany, co
     const connect = async () => {
       try {
         const token = await requestPortalToken(company);
-        await auth.signInFromPortal!(token, company);
+        await auth.signInFromPortal!(token, company,new URLSearchParams(location.search).get("scope")==="all");
         if (active) setBridgeState("ready");
       } catch {
         if (active) {
@@ -144,7 +144,8 @@ type FirebaseSession=Extract<RuntimeSession,{mode:"firebase"}>;
 function CompanyBoundary({group,forCompany,companyAccess,children}:{group:FirebaseSession;forCompany:(id:string)=>CompanyScopeRepositories;companyAccess:CompanyAccessRepository;children:ReactNode}) {
   const l=useBusinessText(),{t}=useI18n(),portalCompany=portalEmbedCompany(window.location.search);
   const permitted=authorizedBusinesses(group.membership.companyIds);
-  const available=portalCompany?permitted.filter(b=>businessQueryValue(b.id)===portalCompany):permitted;
+  const reportAll=new URLSearchParams(location.search).get("scope")==="all"&&group.membership.role==="owner";
+  const available=portalCompany&&!reportAll?permitted.filter(b=>businessQueryValue(b.id)===portalCompany):permitted;
   const storageKey=`d2-company:${group.identity.uid}`;
   const [selected,setSelected]=useState<string>(()=>{try{return preferredBusinessId(window.location.search,localStorage.getItem(storageKey));}catch{return preferredBusinessId(window.location.search,null);}});
   const active=available.find(b=>b.id===selected)??available[0];

@@ -67,9 +67,9 @@ export class FirebaseAuthGateway implements AuthGateway {
     return identityFromFirebaseUser(result.user);
   }
 
-  async signInFromPortal(portalToken: string, company: "smart" | "hvac"): Promise<void> {
-    const exchange = httpsCallable<{ portalToken: string; company: "smart" | "hvac" }, { token: string }>(this.functions, "portalCrmExchange");
-    const result = await exchange({ portalToken, company });
+  async signInFromPortal(portalToken: string, company: "smart" | "hvac",reportAll=false): Promise<void> {
+    const exchange = httpsCallable<{ portalToken: string; company: "smart" | "hvac";scope?:"all" }, { token: string }>(this.functions, "portalCrmExchange");
+    const result = await exchange({ portalToken, company, ...(reportAll?{scope:"all" as const}:{}) });
     await setPersistence(this.auth, inMemoryPersistence);
     await signInWithCustomToken(this.auth, result.data.token);
   }
