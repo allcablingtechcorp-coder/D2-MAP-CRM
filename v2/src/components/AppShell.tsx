@@ -137,7 +137,7 @@ export function AppShell({
 
           </div>
         </header>
-        <CompanySelector/>
+        {!portalEmbed && <CompanySelector/>}
         <main className="page-content">{children}</main>
       </div>
     </div>
