@@ -25,6 +25,31 @@ describe.skipIf(!enabled)("company isolation in the Firestore emulator",()=>{
   for(const call of [()=>api.loadCommercialPage.run(q("smart-admin",hvac,{collection:"companies"})),()=>api.createCommercialCompany.run(q("smart-admin",hvac,{name:"Attempt",location:"FL",industry:"",website:"",phone:""})),()=>api.commercialRecordHistory.run(q("smart-admin",hvac,{collection:"companies",recordId:"same"})),()=>api.listAssignmentOptions.run(q("smart-admin",hvac))])await expect(call()).rejects.toMatchObject({code:"permission-denied"});
   expect((await api.loadCommercialPage.run(q("both-rep",hvac,{collection:"companies"}))).records[0]?.name).toBe(hvac);
  });
+ it("protected-owner Portal sessions keep commercial and group administration with live revocation checks",async()=>{
+  const token={email:"allcablingtechcorp@gmail.com",firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_owner:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300};
+  await ref(group).collection("memberships").doc("company-owner").update({email:token.email,ownerProtected:true});
+  for(const org of [smart,hvac]){
+    const result=await api.createCommercialCompany.run(q("company-owner",org,{name:"Portal owner test",location:"FL",industry:"",website:"",phone:""},token));
+    expect(result.company.id).toBeTruthy();
+  }
+  await api.createGovernanceTeam.run(q("company-owner",group,{name:"Portal integration team"},token));
+  expect((await api.listGovernanceDirectory.run(q("company-owner",group,{},token))).teams[0]?.name).toBe("Portal integration team");
+  const accessRequest={...q("company-owner",group,{},token),data:{action:"list"}} as CallableRequest;
+  expect((await api.companyAccess.run(accessRequest)).members.length).toBeGreaterThan(0);
+  await api.companyAccess.run({...accessRequest,data:{action:"save",targetUid:"both-rep",companyIds:[smart],reason:"Portal integration test"}} as CallableRequest);
+  expect((await ref(group).collection("memberships").doc("both-rep").get()).data()?.companyIds).toEqual([smart]);
+  const patch={role:"sales_rep",status:"suspended",scope:"organization",modules,teamIds:[]};
+  await api.saveMembership.run(q("company-owner",smart,{targetUid:"both-rep",patch,reason:"Portal role test"},token));
+  expect((await ref(smart).collection("memberships").doc("both-rep").get()).data()?.status).toBe("suspended");
+  for(const unsafe of [{...token,portal_until:1},{...token,portal_report_all:true}])await expect(api.companyAccess.run({...accessRequest,auth:{...accessRequest.auth!,token:unsafe}} as CallableRequest)).rejects.toMatchObject({code:"permission-denied"});
+  await expect(api.companyAccess.run({...accessRequest,auth:{uid:"both-rep",token}} as CallableRequest)).rejects.toMatchObject({code:"permission-denied"});
+  // Matching the corporate email never substitutes for the stored protected flag.
+  await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:false});
+  await expect(api.companyAccess.run(accessRequest)).rejects.toMatchObject({code:"permission-denied"});
+  await expect(api.createCommercialCompany.run(q("company-owner",smart,{name:"Blocked",location:"FL",industry:"",website:"",phone:""},token))).rejects.toMatchObject({code:"permission-denied"});
+  await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:true,status:"suspended"});
+  await expect(api.companyAccess.run(accessRequest)).rejects.toMatchObject({code:"permission-denied"});
+ });
  it("consolidated Portal reports require a live protected owner and cannot write either company",async()=>{
   const token={firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300,portal_report_all:true};
   await ref(group).collection("memberships").doc("company-owner").update({ownerProtected:true});

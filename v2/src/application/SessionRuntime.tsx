@@ -15,6 +15,7 @@ import { LanguageFlag } from "../components/LanguageFlag";
 import { PortalReturnLink } from "../components/PortalReturnLink";
 import { portalEmbedCompany, requestPortalToken } from "./portalHandoff";
 import type { CommercialRepository } from "./commercial";
+import {canUseGroupAdministration} from "../domain/companyAdministration";
 
 type RuntimeSession =
   | { mode: "demo"; identity: null; membership: null }
@@ -146,6 +147,7 @@ function CompanyBoundary({group,forCompany,companyAccess,children}:{group:Fireba
   const permitted=authorizedBusinesses(group.membership.companyIds);
   const reportAll=new URLSearchParams(location.search).get("scope")==="all"&&group.membership.role==="owner";
   const available=portalCompany&&!reportAll?permitted.filter(b=>businessQueryValue(b.id)===portalCompany):permitted;
+  const superAdmin=canUseGroupAdministration(group.membership,Boolean(portalCompany),reportAll);
   const storageKey=`d2-company:${group.identity.uid}`;
   const [selected,setSelected]=useState<string>(()=>{try{return preferredBusinessId(window.location.search,localStorage.getItem(storageKey));}catch{return preferredBusinessId(window.location.search,null);}});
   const active=available.find(b=>b.id===selected)??available[0];
@@ -153,7 +155,7 @@ function CompanyBoundary({group,forCompany,companyAccess,children}:{group:Fireba
   const select=(id:BusinessId)=>{if(!available.some(b=>b.id===id))return;setSelected(id);try{localStorage.setItem(storageKey,id);}catch{/* Selection still works without storage. */}const url=new URL(window.location.href);if(url.searchParams.has("company")){url.searchParams.set("company",businessQueryValue(id));window.history.replaceState(window.history.state,"",url);}};
   const scopes=useMemo(()=>Object.fromEntries(businesses.map(b=>[b.id,forCompany(b.id)])),[forCompany]);
   if(!active)return <div className="session-page"><section className="session-card"><Brand/><p>{l.none}</p><button className="action-button" onClick={group.signOut}>{t("auth.signOut")}</button></section></div>;
-  return <CompanyContext.Provider value={{active,available,select,superAdmin:!portalCompany&&group.membership.role==="owner",groupMemberships:portalCompany?undefined:group.memberships,access:portalCompany?undefined:companyAccess,repositories:id=>scopes[id]}}><CompanySession key={active.id} group={group} scope={scopes[active.id]} organizationId={active.id}>{children}</CompanySession></CompanyContext.Provider>;
+  return <CompanyContext.Provider value={{active,available,select,superAdmin,groupMemberships:superAdmin?group.memberships:undefined,access:superAdmin?companyAccess:undefined,repositories:id=>scopes[id]}}><CompanySession key={active.id} group={group} scope={scopes[active.id]} organizationId={active.id}>{children}</CompanySession></CompanyContext.Provider>;
 }
 function CompanySession({group,scope,organizationId,children}:{group:FirebaseSession;scope:CompanyScopeRepositories;organizationId:string;children:ReactNode}) {
   const l=useBusinessText(),{t}=useI18n(); const [membership,setMembership]=useState<Membership|null>(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);

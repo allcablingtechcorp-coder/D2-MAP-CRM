@@ -4,7 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { crmCallableOptions, consumeRequestBudget } from "./requestProtection.js";
 import { GROUP_ID } from "./companyWorkspaces.js";
-import { isProtectedOwner, parseMembershipDocument, type MembershipDocument } from "./membershipPolicy.js";
+import { canManageMemberships, isProtectedOwner, parseMembershipDocument, type MembershipDocument } from "./membershipPolicy.js";
 
 const PORTAL_PROJECT = "d2-group-system";
 const PORTAL_SESSION_URL = "https://d2-group-system.web.app/api/workspace";
@@ -42,6 +42,19 @@ export function portalCrmGrant(session: unknown, uid: string, email: string, com
 function verifier() {
   const app = (() => { try { return getApp("d2-portal-verifier"); } catch { return initializeApp({ projectId: PORTAL_PROJECT }, "d2-portal-verifier"); } })();
   return getAuth(app);
+}
+
+export function ownerPortalReady(session:unknown,uid:string,email:string,group:MembershipDocument,companyIds:unknown,members:Record<string,MembershipDocument>):boolean {
+  const state=session as {superAdmin?:boolean}|null;
+  return state?.superAdmin===true && email===PORTAL_OWNER_EMAIL
+    && group.ownerProtected===true && group.email===CRM_OWNER_EMAIL && canManageMemberships(group)
+    && Array.isArray(companyIds) && Object.values(organizationByCompany).every(id=>companyIds.includes(id)
+      && members[id]?.email===CRM_OWNER_EMAIL && canManageMemberships(members[id]!))
+    && ["smart","hvac"].every(value=>{
+      if(!portalCrmGrant(session,uid,email,value as Company))return false;
+      const grant=(session as {grants:Record<string,{modules:{crm:{actions:string[]}}}>}).grants[value]!.modules.crm;
+      return ["read","create","edit","assign","export"].every(action=>grant.actions.includes(action));
+    });
 }
 
 function tokenSigner() {
@@ -109,7 +122,14 @@ export const portalCrmExchange = onCall(crmCallableOptions, async request => {
       if(!membership||membership.status!=="active"||membership.role!=="owner"||!group.data()?.companyIds?.includes(companyId))throw new HttpsError("permission-denied","Combined report membership is unavailable");
     }
   }
+  const ownerMembers:Record<string,MembershipDocument>={[org]:companyAccess};
+  if(owner && input.scope!=="all")for(const companyId of Object.values(organizationByCompany)){
+    if(companyId===org)continue;
+    const record=await db.doc(`organizations/${companyId}/memberships/${user.uid}`).get();
+    if(record.exists)ownerMembers[companyId]=parseMembershipDocument(record.data());
+  }
+  const fullOwner=input.scope!=="all" && ownerPortalReady(session,decoded.uid,email,groupAccess,group.data()?.companyIds,ownerMembers);
   const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
-  const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt, ...(input.scope==="all"?{portal_report_all:true}:{}) });
+  const token = await tokenSigner().createCustomToken(user.uid, { portal_bridge: true, portal_company: company, portal_until: expiresAt, ...(input.scope==="all"?{portal_report_all:true}:fullOwner?{portal_owner:true}:{}) });
   return { token, expiresAt };
 });

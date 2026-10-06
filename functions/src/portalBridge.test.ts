@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { leonardoCrmMembershipReady, portalCrmGrant } from "./portalBridge.js";
+import { leonardoCrmMembershipReady, portalCrmGrant, ownerPortalReady } from "./portalBridge.js";
 import { assertPortalLease } from "./requestProtection.js";
+import {parseMembershipDocument} from "./membershipPolicy.js";
 
 const owner = "dante.frota@allcablingtech.com";
 const session = {
@@ -12,6 +13,28 @@ const session = {
 };
 
 describe("Portal CRM owner handoff", () => {
+  it("issues full administration only for a protected source owner and two full live Portal grants",()=>{
+    const member=parseMembershipDocument({email:"allcablingtechcorp@gmail.com",displayName:"Owner",role:"owner",status:"active",scope:"organization",modules:["dashboard","leads","pipeline","activities","prospecting","companies","reports","admin"],ownerProtected:true});
+    const grant={status:"active",modules:{crm:{scope:"company",actions:["read","create","edit","assign","export"]}}};
+    const full={...session,grants:{smart:grant,hvac:grant}};
+    const members={"d2-smart-home":member,"d2-hvac-solutions":member},ids=Object.keys(members);
+    const ready=(group=member,portal:unknown=full,records=members,companies:unknown=ids)=>ownerPortalReady(portal,"portal-owner",owner,group,companies,records);
+    expect(ready()).toBe(true);
+    expect(ready({...member,ownerProtected:false})).toBe(false);
+    expect(ready({...member,status:"suspended"})).toBe(false);
+    expect(ready({...member,role:"sales_manager"})).toBe(false);
+    expect(ready(member,session)).toBe(false);
+    expect(ready(member,{...full,superAdmin:false})).toBe(false);
+    expect(ready(member,full,members,["d2-smart-home"])).toBe(false);
+    expect(ready(member,full,{...members,"d2-hvac-solutions":{...member,status:"revoked"}})).toBe(false);
+  });
+  it("owner leases allow existing company and group operations but report leases remain read-only",()=>{
+    const token={firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_owner:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300};
+    for(const org of ["d2-group","d2-smart-home","d2-hvac-solutions"])expect(()=>assertPortalLease(token,org)).not.toThrow();
+    expect(()=>assertPortalLease(token,"other")).toThrow();
+    expect(()=>assertPortalLease({...token,portal_until:1},"d2-group")).toThrow();
+    expect(()=>assertPortalLease({...token,portal_report_all:true},"d2-smart-home")).toThrow();
+  });
   it("allows consolidated reads but rejects business mutations even in the base company", () => {
     const token={firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300,portal_report_all:true};
     for(const org of ["d2-smart-home","d2-hvac-solutions"]){

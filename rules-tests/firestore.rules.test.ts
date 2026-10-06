@@ -66,6 +66,30 @@ afterAll(async () => {
 });
 
 describe("Firestore governance rules", () => {
+  it("protected-owner Portal sessions read full governance and cannot write memberships or audit directly",async()=>{
+    const email="allcablingtechcorp@gmail.com";
+    await environment.withSecurityRulesDisabled(async c=>{
+      const d=c.firestore();await updateDoc(doc(d,membershipPath("owner")),{email,ownerProtected:true,companyIds:["d2-smart-home","d2-hvac-solutions"]});
+      for(const org of ["d2-smart-home","d2-hvac-solutions"]){
+        await setDoc(doc(d,`organizations/${org}/memberships/owner`),{...membership("owner"),email});
+        await setDoc(doc(d,`organizations/${org}/auditEvents/one`),{action:"Test"});
+      }
+    });
+    const claims={email,firebase:{sign_in_provider:"custom"},portal_bridge:true,portal_owner:true,portal_company:"smart",portal_until:Math.floor(Date.now()/1000)+300};
+    const d=environment.authenticatedContext("owner",claims).firestore();
+    for(const org of ["d2-group","d2-smart-home","d2-hvac-solutions"]){
+      await assertSucceeds(getDocs(collection(d,`organizations/${org}/memberships`)));
+      await assertSucceeds(getDocs(collection(d,`organizations/${org}/auditEvents`)));
+      await assertFails(setDoc(doc(d,`organizations/${org}/memberships/forged`),membership("owner")));
+      await assertFails(setDoc(doc(d,`organizations/${org}/auditEvents/forged`),{action:"Forged"}));
+    }
+    for(const [uid,patch] of [["representative",{}],["owner",{email:"other@example.test"}],["owner",{portal_until:1}],["owner",{portal_report_all:true}] ] as const){
+      const blocked=environment.authenticatedContext(uid,{...claims,...patch}).firestore();
+      await assertFails(getDocs(collection(blocked,"organizations/d2-group/memberships")));
+    }
+    await environment.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),membershipPath("owner")),{ownerProtected:false}));
+    await assertFails(getDocs(collection(d,"organizations/d2-group/memberships")));
+  });
   it("allows protected-owner report membership reads across both companies and rejects stale grants",async()=>{
     await environment.withSecurityRulesDisabled(async context=>{
       const db=context.firestore();
