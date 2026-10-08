@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Activity, Lead, Opportunity } from "./crm";
-import { closedDealWinRate, leadSourceDistribution, leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSevenDays } from "./metrics";
+import { closedDealWinRate, leadSourceDistribution, leadActivityCoverage, openPipelineValue, pendingDueToday, pendingNextSevenDays,pendingActivityRecords } from "./metrics";
 
 const activity = (id: string, dueAt: string, completed = false, companyName = "Alpha"): Activity => ({
   id, dueAt, completed, companyName, kind: "call", ownerName: "Owner", subject: "Follow-up",
@@ -35,6 +35,8 @@ describe("commercial metrics", () => {
       activity("overdue", "2026-09-18T09:00:00-04:00"),
     ];
     expect(pendingNextSevenDays(activities, now)).toBe(2);
+    expect(pendingActivityRecords(activities,7,now).map(item=>item.id)).toEqual(['today','six-days']);
+    expect(pendingActivityRecords(activities,1,now).map(item=>item.id)).toEqual(['today']);
   });
 
   it("excludes closed deals from pipeline value and intersects activity coverage with leads", () => {

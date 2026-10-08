@@ -16,7 +16,7 @@ import { AdminGovernance } from "./components/AdminGovernance";
 import { ActivityDialog, LeadDialog, OpportunityDialog } from "./components/CommercialDialogs";
 import { useCrmWorkspace } from "./application/CrmWorkspaceLive";
 import { nextOpenStage } from "./domain/workflows";
-import { closedDealWinRate, openPipelineValue, pendingDueToday, pendingNextSevenDays } from "./domain/metrics";
+import { closedDealWinRate, openPipelineValue, pendingDueToday, pendingNextSevenDays, pendingActivityRecords } from "./domain/metrics";
 import { CommercialDetails } from "./components/CommercialDetails";
 import { activeLeadFilterCount, emptyLeadFilters, filterLeads, type LeadFilters } from "./domain/leadFilters";
 import { useRuntimeSession } from "./application/SessionRuntime";
@@ -51,10 +51,10 @@ function Dashboard() {
   return <>
     <PageHeader eyebrow={t("dashboard.eyebrow")} title={t("audit.dashboardTitle")} description={t("dashboard.description")} actions={<ActionButton disabled={!can("lead.create")} onClick={() => setLeadDialogOpen(true)}><Plus size={17} /> {t("dashboard.newLead")}</ActionButton>} />
     <div className="metrics-grid">
-      <MetricCard label={t("dashboard.openPipeline")} value={formatMoney(pipelineValue)} detail={t("dashboard.activeOpportunities", { count: opportunities.filter((item) => openStages.includes(item.stage)).length })} tone="positive" />
-      <MetricCard label={t("dashboard.activeLeads")} value={String(leads.length)} detail={t("dashboard.mapOrigin", { count: leads.filter((lead) => lead.source === "map").length })} />
-      <MetricCard label={t("dashboard.pendingActivities")} value={String(activities.filter((item) => !item.completed).length)} detail={t("dashboard.dueToday", { count: dueToday })} tone="warning" />
-      <MetricCard label={t("audit.winRate")} value={winRate === null ? "—" : `${winRate}%`} detail={t(winRate === null ? "audit.noClosedDeals" : "audit.winRateDefinition")} />
+      <MetricCard label={t("dashboard.openPipeline")} value={formatMoney(pipelineValue)} detail={t("dashboard.activeOpportunities", { count: opportunities.filter((item) => openStages.includes(item.stage)).length })} tone="positive" source={opportunities.filter(item=>openStages.includes(item.stage)).map(item=>({id:item.id,label:item.companyName,value:formatMoney(item.amountCents),detail:t(stageKeys[item.stage])}))} />
+      <MetricCard label={t("dashboard.activeLeads")} value={String(leads.length)} detail={t("dashboard.mapOrigin", { count: leads.filter((lead) => lead.source === "map").length })} source={leads.map(item=>({id:item.id,label:item.companyName,detail:item.ownerName}))} />
+      <MetricCard label={t("dashboard.pendingActivities")} value={String(activities.filter((item) => !item.completed).length)} detail={t("dashboard.dueToday", { count: dueToday })} tone="warning" source={activities.filter(item=>!item.completed).map(item=>({id:item.id,label:item.subject,detail:item.companyName,value:formatDateTime(item.dueAt)}))} />
+      <MetricCard label={t("audit.winRate")} value={winRate === null ? "—" : `${winRate}%`} detail={t(winRate === null ? "audit.noClosedDeals" : "audit.winRateDefinition")} source={opportunities.filter(item=>item.stage==='won'||item.stage==='lost').map(item=>({id:item.id,label:item.companyName,detail:t(stageKeys[item.stage])}))} />
     </div>
     <div className="dashboard-grid">
       <Panel title={t("dashboard.salesPipeline")} description={t("dashboard.valueByStage")}>
@@ -135,7 +135,7 @@ function Activities() {
   const today = pendingDueToday(activities);
   const nextSeven = pendingNextSevenDays(activities);
   return <><div className="maintenance-toolbar"><RecordManagerButton collection="activities"/></div><PageHeader eyebrow={t("activities.eyebrow")} title={t("activities.title")} description={t("activities.description")} actions={<ActionButton disabled={!can("activity.create")} onClick={() => setDialogOpen(true)}><Plus size={17} /> {t("activities.new")}</ActionButton>} />
-    <div className="metrics-grid compact"><MetricCard label={t("activities.today")} value={String(today)} detail={t("activities.onTime")} /><MetricCard label={t("activities.nextSeven")} value={String(nextSeven)} detail={t("activities.teamSchedule")} /><MetricCard label={t("activities.completed")} value={String(completed.length)} detail={t("audit.allAuthorizedRecords")} tone="positive" /></div>
+    <div className="metrics-grid compact"><MetricCard label={t("activities.today")} value={String(today)} detail={t("activities.onTime")} source={pendingActivityRecords(activities,1).map(item=>({id:item.id,label:item.subject,detail:item.companyName,value:formatDateTime(item.dueAt)}))}/><MetricCard label={t("activities.nextSeven")} value={String(nextSeven)} detail={t("activities.teamSchedule")} source={pendingActivityRecords(activities,7).map(item=>({id:item.id,label:item.subject,detail:item.companyName,value:formatDateTime(item.dueAt)}))}/><MetricCard label={t("activities.completed")} value={String(completed.length)} detail={t("audit.allAuthorizedRecords")} tone="positive" source={completed.map(item=>({id:item.id,label:item.subject,detail:item.companyName,value:formatDateTime(item.dueAt)}))}/></div>
     <Panel title={t("activities.schedule")} description={t("activities.ordered")}><div className="agenda-list">{[...activities].sort((a, b) => a.dueAt.localeCompare(b.dueAt)).map((activity) => <article key={activity.id} className={activity.completed ? "completed" : ""}><button className="complete-control" onClick={() => completeActivity(activity.id)} disabled={activity.completed || !can("activity.create")} aria-label={t(activity.completed ? "activities.completed" : "activities.markComplete")} aria-pressed={activity.completed}><CheckCircle2 size={20} fill={activity.completed ? "currentColor" : "none"} /></button><div className={`activity-kind ${activity.kind}`}>{t(activityKeys[activity.kind])}</div><div className="agenda-copy"><strong>{activity.subject}</strong><span>{activity.companyName}</span></div><div className="agenda-owner"><span className="mini-avatar">{activity.ownerName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>{activity.ownerName}</div><time>{formatDateTime(activity.dueAt)}</time></article>)}</div></Panel>
     {dialogOpen && <ActivityDialog onClose={() => setDialogOpen(false)} />}
   </>;

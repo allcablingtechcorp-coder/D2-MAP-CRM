@@ -110,6 +110,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .metric-card small { width: fit-content; padding: 3px 7px; border-radius: 5px; background: #f1f4f8; color: #68758a; font-size: 14px; font-weight: 600; }
 .metric-card small.positive { background: #e9f8f2; color: #087a54; }
 .metric-card small.warning { background: #fff5df; color: #a86605; }
+.metric-card-action{text-align:left;cursor:pointer;position:relative;transition:border-color .15s,box-shadow .15s;}
+.metric-card-action:hover{border-color:var(--blue);box-shadow:0 5px 18px #18305018;}
+.metric-card-action:focus-visible{outline:3px solid var(--blue);outline-offset:3px;}
+.metric-source-modal{width:min(680px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;}
+.metric-source-value{display:block;margin-top:8px;font-size:28px;color:var(--blue);}
+.metric-source-list{list-style:none;margin:0;padding:0 20px 20px;}
+.metric-source-list li{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--border);}
+.metric-source-list li>div{min-width:0;overflow-wrap:anywhere;}
+.metric-source-list small{display:block;margin-top:5px;color:var(--muted);}
+@media(max-width:480px){.metric-source-list li{align-items:flex-start;flex-direction:column;gap:7px;}}
 .panel { overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
 .panel-header { min-height: 67px; padding: 16px 19px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #edf0f4; }
 .panel-header h2 { margin: 0; color: #243147; font: 700 14px "Manrope", sans-serif; }

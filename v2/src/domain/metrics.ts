@@ -9,21 +9,21 @@ function localDayBounds(now: Date) {
 }
 
 export function pendingDueToday(activities: Activity[], now = new Date()): number {
-  const { start, end } = localDayBounds(now);
-  return activities.filter((activity) => {
-    const dueAt = new Date(activity.dueAt).getTime();
-    return !activity.completed && Number.isFinite(dueAt) && dueAt >= start && dueAt < end;
-  }).length;
+  return pendingActivityRecords(activities,1,now).length;
 }
 
 export function pendingNextSevenDays(activities: Activity[], now = new Date()): number {
+  return pendingActivityRecords(activities,7,now).length;
+}
+
+export function pendingActivityRecords(activities:Activity[],days:number,now=new Date()):Activity[]{
   const { start } = localDayBounds(now);
   const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  end.setDate(end.getDate() + days);
   return activities.filter((activity) => {
     const dueAt = new Date(activity.dueAt).getTime();
     return !activity.completed && Number.isFinite(dueAt) && dueAt >= start && dueAt < end.getTime();
-  }).length;
+  });
 }
 
 export function openPipelineValue(opportunities: Opportunity[]): number {
