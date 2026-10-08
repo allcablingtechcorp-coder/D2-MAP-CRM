@@ -1,4 +1,5 @@
-import type { ComponentType, ReactNode } from "react";
+import {useState,type ComponentType,type ReactNode} from "react";
+import {MetricSource,type MetricSourceRow} from './MetricSource';
 import {
   Activity,
   BarChart3,
@@ -176,17 +177,18 @@ export function MetricCard({
   value,
   detail,
   tone = "neutral",
+  source,
 }: {
   label: string;
   value: string;
   detail: string;
   tone?: "neutral" | "positive" | "warning";
+  source?: MetricSourceRow[];
 }) {
+  const [open,setOpen]=useState(false);
+  const content=<><span>{label}</span><strong>{value}</strong><small className={`metric-detail ${tone}`}>{detail}</small></>;
   return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small className={`metric-detail ${tone}`}>{detail}</small>
-    </article>
+    <>{source?<button type="button" className="metric-card metric-card-action" aria-haspopup="dialog" onClick={()=>setOpen(true)}>{content}</button>:<article className="metric-card">{content}</article>}
+    {open&&source&&<MetricSource label={label} value={value} detail={detail} rows={source} onClose={()=>setOpen(false)}/>}</>
   );
 }
